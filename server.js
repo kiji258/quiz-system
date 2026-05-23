@@ -314,8 +314,21 @@ app.get('/api/scores', (req, res) => {
     }));
     res.json(scores);
 });
-app.post('/api/team-members/:teamId', (req, res) => { /* ... 省略，与之前相同 */ });
-app.delete('/api/team-members/:teamId', (req, res) => { /* ... 省略 */ });
+app.post('/api/team-members/:teamId', (req, res) => {
+    const teamId = parseInt(req.params.teamId);
+    const { playerName } = req.body;
+    if (!teamMembers[teamId]) teamMembers[teamId] = [];
+    if (playerName && !teamMembers[teamId].includes(playerName)) teamMembers[teamId].push(playerName);
+    broadcastState();
+    res.json({ success: true });
+});
+app.delete('/api/team-members/:teamId', (req, res) => {
+    const teamId = parseInt(req.params.teamId);
+    const { playerName } = req.body;
+    if (teamMembers[teamId]) teamMembers[teamId] = teamMembers[teamId].filter(n => n !== playerName);
+    broadcastState();
+    res.json({ success: true });
+});
 app.post('/api/rush-questions', (req, res) => { const q = req.body; q.id = 'r' + Date.now(); RUSH_QUESTIONS.push(q); res.json({ success: true }); });
 app.put('/api/rush-questions/:id', (req, res) => { const id = req.params.id; const i = RUSH_QUESTIONS.findIndex(q => q.id === id); if (i !== -1) { RUSH_QUESTIONS[i] = { ...req.body, id }; res.json({ success: true }); } else res.status(404).json({ error: 'not found' }); });
 app.delete('/api/rush-questions/:id', (req, res) => { RUSH_QUESTIONS = RUSH_QUESTIONS.filter(q => q.id !== req.params.id); res.json({ success: true }); });
