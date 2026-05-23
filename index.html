@@ -116,7 +116,7 @@
         return `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name} <span class="member-count">${cnt}</span></div><div class="score-big">${p.score}</div></div>`;
     }
 
-    // ============ 登录界面 ============
+    // ============ 登录界面（已区分密码） ============
     function renderLogin() {
         if(document.getElementById('loginPage')) return;
         document.getElementById('app').innerHTML = `
@@ -140,7 +140,7 @@
         };
         document.getElementById('hostBtn').onclick = () => {
             clearHighlights();
-            targetRole='host';
+            targetRole = 'host';
             document.getElementById('passwordDiv').classList.remove('hidden');
             const btn = document.getElementById('hostBtn');
             btn.classList.add('btn-highlight');
@@ -149,7 +149,7 @@
         };
         document.getElementById('adminBtn').onclick = () => {
             clearHighlights();
-            targetRole='admin';
+            targetRole = 'admin';
             document.getElementById('passwordDiv').classList.remove('hidden');
             const btn = document.getElementById('adminBtn');
             btn.classList.add('btn-highlight');
@@ -165,14 +165,28 @@
             setTimeout(() => window.location.href='?role=player',200);
         };
         document.getElementById('submitPwd').onclick = () => {
-            if(document.getElementById('password').value==='1147') window.location.href=`?role=${targetRole}`;
-            else alert('密码错误');
+            const password = document.getElementById('password').value;
+            // 主持人密码：123，管理员密码：456
+            if (targetRole === 'host' && password === '123') {
+                window.location.href = '?role=host';
+            } else if (targetRole === 'admin' && password === '1147') {
+                window.location.href = '?role=admin';
+            } else {
+                alert('密码错误');
+            }
         };
     }
 
     // ============ 选手登录 ============
     function renderPlayerLogin() {
-        if(!gameState) return;
+        if(!gameState) {
+            document.getElementById('app').innerHTML = `
+                <div class="panel" style="max-width:400px;margin:10vh auto;text-align:center;">
+                    <p>⏳ 正在连接服务器，请稍候...</p>
+                    <p style="color:#f0c040;font-size:0.9rem;">如果长时间无响应，请确认服务器已启动</p>
+                </div>`;
+            return;
+        }
         if(playerLoginRendered) { updateTeamSelectOptions(); return; }
         document.getElementById('app').innerHTML = `
             <div class="panel" id="playerLoginPage" style="max-width:400px;margin:10vh auto;">
@@ -180,6 +194,7 @@
                 <input id="playerName" placeholder="请输入您的真实姓名">
                 <select id="teamSelect"></select>
                 <button class="btn btn-primary" id="joinBtn" style="width:100%;">进入赛场</button>
+                <p id="loginError" style="color:red;margin-top:8px;display:none;"></p>
             </div>`;
         playerLoginRendered = true;
         updateTeamSelectOptions();
@@ -187,9 +202,27 @@
             const name = document.getElementById('playerName').value.trim();
             if(!name) return alert('请输入姓名');
             const teamId = parseInt(document.getElementById('teamSelect').value);
-            await fetch(`/api/team-members/${teamId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
-            currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName: name };
-            renderFullPage(); startLocalTimers();
+            const errorEl = document.getElementById('loginError');
+            try {
+                const response = await fetch(`/api/team-members/${teamId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerName: name })
+                });
+                if (!response.ok) throw new Error('网络错误');
+                const result = await response.json();
+                if (!result.success) throw new Error('添加失败');
+                currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName: name };
+                renderFullPage();
+                startLocalTimers();
+            } catch (err) {
+                console.error(err);
+                if (errorEl) {
+                    errorEl.textContent = '❌ 连接失败，请确认服务器已启动！';
+                    errorEl.style.display = 'block';
+                }
+                setTimeout(() => { if(errorEl) errorEl.style.display = 'none'; }, 4000);
+            }
         };
     }
     function updateTeamSelectOptions() {
