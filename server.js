@@ -9,7 +9,6 @@ const wss = new WebSocket.Server({ server });
 app.use(express.static(__dirname));
 app.use(express.json());
 
-// ======================== 预设队伍 ========================
 const PRESET_TEAMS = [
     { id: 0, name: '拌料队', emoji: '🥣', color: '#ef4444' },
     { id: 1, name: '焙烧队', emoji: '🔥', color: '#f59e0b' },
@@ -23,20 +22,15 @@ const PRESET_TEAMS = [
     { id: 9, name: '观众队', emoji: '👥', color: '#a855f7' },
 ];
 
-// ======================== 题库 ========================
 let RUSH_QUESTIONS = [
     { id: 'r1', type: '选择题', question: '中国的首都是哪个城市？', options: ['上海', '北京', '广州', '深圳'], answer: 1 },
     { id: 'r2', type: '判断题', question: '光在真空中的速度约为每秒30万公里。', options: ['正确', '错误'], answer: 0 },
-    { id: 'r3', type: '选择题', question: '以下哪个不是安全电压？', options: ['12V', '36V', '110V', '220V'], answer: 3 },
-    { id: 'r4', type: '判断题', question: '电器着火时可以直接用水扑灭。', options: ['正确', '错误'], answer: 1 },
 ];
 let MUTUAL_QUESTIONS = [
     { id: 'm1', type: '选择题', question: '灭火器压力表指针在什么区域表示正常？', options: ['红色', '绿色', '黄色', '蓝色'], answer: 1 },
     { id: 'm2', type: '判断题', question: '电器着火时可以直接用水扑灭。', options: ['正确', '错误'], answer: 1 },
-    { id: 'm3', type: '选择题', question: '安全带的正确挂扣应该是？', options: ['低挂高用', '高挂低用', '随便挂', '不用挂'], answer: 1 },
 ];
 
-// ======================== 辅助数据 ========================
 let teamMembers = {};
 PRESET_TEAMS.forEach(t => { teamMembers[t.id] = []; });
 let answerHistory = [];
@@ -58,12 +52,11 @@ function addHistoryRecord(activityType, teamId, teamName, playerName, question, 
     if (answerHistory.length > 500) answerHistory.pop();
 }
 
-// ======================== 游戏状态 ========================
 let gameState = {
     players: PRESET_TEAMS.map(t => ({ ...t, score: 0 })),
     currentActivity: 'rush',
     rush: {
-        roundState: 'IDLE',           // IDLE | RUSHING | ANSWERING | FINISHED
+        roundState: 'IDLE',
         currentQuestion: null,
         rushEndTime: 0,
         answerEndTime: 0,
@@ -92,26 +85,27 @@ let gameState = {
     lastAnswerResult: null,
 };
 
-// 计算活跃队伍（至少有一个成员）
 function getActiveTeams() {
     return gameState.players.filter(p => teamMembers[p.id] && teamMembers[p.id].length > 0);
 }
 
-// 广播状态时附加活跃队伍和成员信息
 function broadcastState() {
-    const activeTeams = getActiveTeams();
+    const activeTeams = getActiveTeams().map(t => t.id);
     const stateToSend = {
         ...gameState,
-        activeTeams: activeTeams.map(t => t.id), // 仅发送ID数组
-        teamMembers, // 最新成员列表
+        activeTeams,
+        teamMembers,
     };
+    // 清除不可序列化的定时器引用
+    stateToSend.rush.rushTimer = null;
+    stateToSend.rush.answerTimer = null;
+    stateToSend.mutual.answerTimer = null;
     const data = JSON.stringify({ type: 'STATE', state: stateToSend });
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) client.send(data);
     });
 }
 
-// 清除定时器
 function clearRushTimers() {
     if (gameState.rush.rushTimer) clearTimeout(gameState.rush.rushTimer);
     if (gameState.rush.answerTimer) clearTimeout(gameState.rush.answerTimer);
@@ -123,7 +117,6 @@ function clearMutualTimer() {
     gameState.mutual.answerTimer = null;
 }
 
-// 随机抽题（排除已用）
 function getRandomQuestion(pool, usedIds) {
     let available = pool.filter(q => !usedIds.includes(q.id));
     if (available.length === 0) {
@@ -135,15 +128,27 @@ function getRandomQuestion(pool, usedIds) {
     return { ...q };
 }
 
-// ======================== 抢答逻辑 ========================
+// 获取下一个有成员的答题队伍
+function getNextActiveTeam(startId) {
+    const activeIds = getActiveTeams().map(t => t.id);
+    if (activeIds.length === 0) return null;
+    let nextId = startId % gameState.players.length;
+    let count = 0;
+    while (!activeIds.includes(nextId) || gameState.mutual.teamAnswerCount[nextId] >= 2) {
+        nextId = (nextId + 1) % gameState.players.length;
+        count++;
+        if (count > gameState.players.length + 1) return activeIds[0]; // 兜底
+    }
+    return nextId;
+}
+
 function startRushTimeout() {
     clearRushTimers();
     gameState.rush.rushTimer = setTimeout(() => {
         if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'RUSHING') {
             gameState.rush.roundState = 'FINISHED';
             gameState.lastAnswerResult = {
-                teamId: null,
-                teamName: '系统',
+                teamId: null, teamName: '系统',
                 message: '⏰ 抢答时间到，无人抢答',
                 timestamp: Date.now()
             };
@@ -163,17 +168,14 @@ function startAnswerTimeout() {
     clearRushTimers();
     gameState.rush.answerTimer = setTimeout(() => {
         if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'ANSWERING') {
-            const playerId = gameState.rush.buzzerPlayerId;
-            const playerName = gameState.rush.buzzerPlayerName;
-            const player = gameState.players.find(p => p.id === playerId);
-            if (player) {
+            const p = gameState.players.find(p => p.id === gameState.rush.buzzerPlayerId);
+            if (p) {
                 gameState.rush.roundState = 'FINISHED';
                 gameState.lastAnswerResult = {
-                    teamId: player.id,
-                    teamName: player.name,
-                    playerName: playerName,
+                    teamId: p.id, teamName: p.name,
+                    playerName: gameState.rush.buzzerPlayerName,
                     isCorrect: false,
-                    message: `⏰ ${player.name}（${playerName}）答题超时，不得分`,
+                    message: `⏰ ${p.name} 答题超时，不得分`,
                     timestamp: Date.now()
                 };
                 broadcastState();
@@ -191,16 +193,9 @@ function startAnswerTimeout() {
 
 function skipCurrentRush() {
     clearRushTimers();
-    if (gameState.rush.currentQuestion) {
-        gameState.rush.usedQuestionIds.push(gameState.rush.currentQuestion.id);
-    }
+    if (gameState.rush.currentQuestion) gameState.rush.usedQuestionIds.push(gameState.rush.currentQuestion.id);
     gameState.rush.roundState = 'FINISHED';
-    gameState.lastAnswerResult = {
-        teamId: null,
-        teamName: '主持人',
-        message: '⏭ 主持人跳过本题',
-        timestamp: Date.now()
-    };
+    gameState.lastAnswerResult = { teamId: null, teamName: '主持人', message: '⏭ 主持人跳过本题', timestamp: Date.now() };
     broadcastState();
     setTimeout(() => {
         if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
@@ -216,51 +211,25 @@ function handleRushAnswer(playerId, playerName, selectedIndex) {
     if (rush.roundState !== 'ANSWERING') return false;
     if (rush.buzzerPlayerId !== playerId) return false;
     clearRushTimers();
-
     const isCorrect = (selectedIndex === rush.correctAnswer);
     const player = gameState.players.find(p => p.id === playerId);
     let scoreDelta = 0;
-    if (isCorrect) {
-        scoreDelta = gameState.correctPoints;
-        player.score += scoreDelta;
-    }
+    if (isCorrect) { scoreDelta = gameState.correctPoints; player.score += scoreDelta; }
     addHistoryRecord('rush', playerId, player.name, playerName, rush.currentQuestion, rush.currentQuestion.options[selectedIndex], isCorrect, scoreDelta);
     rush.roundState = 'FINISHED';
     gameState.lastAnswerResult = {
-        teamId: playerId,
-        teamName: player.name,
-        playerName: playerName,
+        teamId: playerId, teamName: player.name, playerName,
         isCorrect,
-        message: isCorrect ? `✅ ${player.name}（${playerName}）回答正确！ +${scoreDelta}分` : `❌ ${player.name}（${playerName}）回答错误！正确答案是 ${rush.currentQuestion.options[rush.correctAnswer]}`,
+        message: isCorrect ? `✅ ${player.name} 正确！+${scoreDelta}分` : `❌ ${player.name} 错误！正确答案是 ${rush.currentQuestion.options[rush.correctAnswer]}`,
         timestamp: Date.now(),
     };
     broadcastState();
     setTimeout(() => {
-        if (gameState.lastAnswerResult && gameState.lastAnswerResult.teamId === playerId) {
-            gameState.lastAnswerResult = null;
-            broadcastState();
-        }
-        if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
-            gameState.rush.roundState = 'IDLE';
-            broadcastState();
-        }
+        if (gameState.lastAnswerResult?.teamId === playerId) gameState.lastAnswerResult = null;
+        if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') gameState.rush.roundState = 'IDLE';
+        broadcastState();
     }, 4000);
     return { correct: isCorrect, msg: gameState.lastAnswerResult.message };
-}
-
-// ======================== 互问互答逻辑 ========================
-// 获取下一个有成员的答题队伍（从指定位置开始搜索）
-function getNextActiveTeam(startId) {
-    const activeIds = getActiveTeams().map(t => t.id);
-    if (activeIds.length === 0) return null;
-    let nextId = startId % gameState.players.length;
-    let count = 0;
-    while (!activeIds.includes(nextId) || gameState.mutual.teamAnswerCount[nextId] >= 2) {
-        nextId = (nextId + 1) % gameState.players.length;
-        count++;
-        if (count > gameState.players.length + 1) break; // 防止死循环
-    }
-    return nextId;
 }
 
 function startMutualAnswerTimeout() {
@@ -272,22 +241,13 @@ function startMutualAnswerTimeout() {
             const player = gameState.players.find(p => p.id === pId);
             if (player) {
                 gameState.mutual.roundActive = false;
-                gameState.mutual.teamAnswerCount[pId] = (gameState.mutual.teamAnswerCount[pId] || 0) + 1;
-                gameState.lastAnswerResult = {
-                    teamId: pId,
-                    teamName: player.name,
-                    playerName: pName,
-                    isCorrect: false,
-                    message: `⏰ ${player.name}（${pName}）答题超时，不得分`,
-                    timestamp: Date.now()
-                };
+                gameState.mutual.teamAnswerCount[pId]++;
+                gameState.lastAnswerResult = { teamId: pId, teamName: player.name, playerName: pName, isCorrect: false, message: `⏰ ${player.name} 答题超时，不得分`, timestamp: Date.now() };
                 advanceMutualTurn(pId);
                 broadcastState();
                 setTimeout(() => {
-                    if (gameState.lastAnswerResult && gameState.lastAnswerResult.teamId === pId) {
-                        gameState.lastAnswerResult = null;
-                        broadcastState();
-                    }
+                    if (gameState.lastAnswerResult?.teamId === pId) gameState.lastAnswerResult = null;
+                    broadcastState();
                 }, 4000);
             }
         }
@@ -296,20 +256,14 @@ function startMutualAnswerTimeout() {
 
 function advanceMutualTurn(answeredTeamId) {
     const mutual = gameState.mutual;
-    // 检查是否所有活跃队伍都已答满2次
-    const activeTeams = getActiveTeams();
-    const allAnsweredTwice = activeTeams.every(t => mutual.teamAnswerCount[t.id] >= 2);
-    if (allAnsweredTwice || activeTeams.length === 0) {
+    const active = getActiveTeams();
+    if (active.every(t => mutual.teamAnswerCount[t.id] >= 2) || active.length === 0) {
         mutual.phaseEnded = true;
         mutual.roundActive = false;
         return;
     }
-    // 下一个答题队伍（跳过无成员或已满2次的）
     let nextAnswerId = getNextActiveTeam(answeredTeamId + 1);
-    if (nextAnswerId === null) {
-        mutual.phaseEnded = true;
-        return;
-    }
+    if (nextAnswerId === null) { mutual.phaseEnded = true; return; }
     mutual.currentDrawTeamId = answeredTeamId;
     mutual.currentAnswerTeamId = nextAnswerId;
     mutual.currentQuestion = null;
@@ -324,38 +278,30 @@ function handleMutualAnswer(playerId, playerName, selectedIndex) {
     if (mutual.answeringPlayerId !== playerId) return false;
     if (Date.now() > mutual.answerEndTime) return false;
     clearMutualTimer();
-
     const isCorrect = (selectedIndex === mutual.currentQuestion.answer);
     const player = gameState.players.find(p => p.id === playerId);
     let scoreDelta = 0;
-    if (isCorrect) {
-        scoreDelta = gameState.correctPoints;
-        player.score += scoreDelta;
-    }
+    if (isCorrect) { scoreDelta = gameState.correctPoints; player.score += scoreDelta; }
     addHistoryRecord('mutual', playerId, player.name, playerName, mutual.currentQuestion, mutual.currentQuestion.options[selectedIndex], isCorrect, scoreDelta);
-    mutual.teamAnswerCount[playerId] = (mutual.teamAnswerCount[playerId] || 0) + 1;
+    mutual.teamAnswerCount[playerId]++;
     mutual.roundActive = false;
     mutual.currentQuestion = null;
     gameState.lastAnswerResult = {
-        teamId: playerId,
-        teamName: player.name,
-        playerName: playerName,
+        teamId: playerId, teamName: player.name, playerName,
         isCorrect,
-        message: isCorrect ? `✅ ${player.name}（${playerName}）回答正确！ +${scoreDelta}分` : `❌ ${player.name}（${playerName}）回答错误！正确答案是 ${mutual.currentQuestion.options[mutual.currentQuestion.answer]}`,
+        message: isCorrect ? `✅ ${player.name} 正确！+${scoreDelta}分` : `❌ ${player.name} 错误！正确答案是 ${mutual.currentQuestion.options[mutual.currentQuestion.answer]}`,
         timestamp: Date.now(),
     };
     advanceMutualTurn(playerId);
     broadcastState();
     setTimeout(() => {
-        if (gameState.lastAnswerResult && gameState.lastAnswerResult.teamId === playerId) {
-            gameState.lastAnswerResult = null;
-            broadcastState();
-        }
+        if (gameState.lastAnswerResult?.teamId === playerId) gameState.lastAnswerResult = null;
+        broadcastState();
     }, 4000);
     return { correct: isCorrect, msg: gameState.lastAnswerResult.message };
 }
 
-// ======================== HTTP API ========================
+// HTTP API
 app.get('/api/rush-questions', (req, res) => res.json(RUSH_QUESTIONS));
 app.get('/api/mutual-questions', (req, res) => res.json(MUTUAL_QUESTIONS));
 app.get('/api/history', (req, res) => res.json(answerHistory));
@@ -365,7 +311,7 @@ app.post('/api/team-members/:teamId', (req, res) => {
     const { playerName } = req.body;
     if (!teamMembers[teamId]) teamMembers[teamId] = [];
     if (playerName && !teamMembers[teamId].includes(playerName)) teamMembers[teamId].push(playerName);
-    broadcastState(); // 实时广播
+    broadcastState();
     res.json({ success: true });
 });
 app.delete('/api/team-members/:teamId', (req, res) => {
@@ -375,20 +321,16 @@ app.delete('/api/team-members/:teamId', (req, res) => {
     broadcastState();
     res.json({ success: true });
 });
-
 app.post('/api/rush-questions', (req, res) => { const q = req.body; q.id = 'r' + Date.now(); RUSH_QUESTIONS.push(q); res.json({ success: true }); });
 app.put('/api/rush-questions/:id', (req, res) => { const id = req.params.id; const i = RUSH_QUESTIONS.findIndex(q => q.id === id); if (i !== -1) { RUSH_QUESTIONS[i] = { ...req.body, id }; res.json({ success: true }); } else res.status(404).json({ error: 'not found' }); });
 app.delete('/api/rush-questions/:id', (req, res) => { RUSH_QUESTIONS = RUSH_QUESTIONS.filter(q => q.id !== req.params.id); res.json({ success: true }); });
-
 app.post('/api/mutual-questions', (req, res) => { const q = req.body; q.id = 'm' + Date.now(); MUTUAL_QUESTIONS.push(q); res.json({ success: true }); });
 app.put('/api/mutual-questions/:id', (req, res) => { const id = req.params.id; const i = MUTUAL_QUESTIONS.findIndex(q => q.id === id); if (i !== -1) { MUTUAL_QUESTIONS[i] = { ...req.body, id }; res.json({ success: true }); } else res.status(404).json({ error: 'not found' }); });
 app.delete('/api/mutual-questions/:id', (req, res) => { MUTUAL_QUESTIONS = MUTUAL_QUESTIONS.filter(q => q.id !== req.params.id); res.json({ success: true }); });
 
-// ======================== WebSocket ========================
 wss.on('connection', (ws) => {
     console.log('客户端连接');
     ws.send(JSON.stringify({ type: 'STATE', state: { ...gameState, activeTeams: getActiveTeams().map(t => t.id), teamMembers } }));
-
     ws.on('message', (msg) => {
         try {
             const data = JSON.parse(msg);
@@ -398,31 +340,21 @@ wss.on('connection', (ws) => {
                     clearRushTimers(); clearMutualTimer();
                     if (payload === 'rush') {
                         gameState.currentActivity = 'rush';
-                        gameState.rush = {
-                            roundState: 'IDLE', currentQuestion: null, rushEndTime: 0, answerEndTime: 0,
-                            buzzerPlayerId: null, buzzerPlayerName: null, correctAnswer: null,
-                            usedQuestionIds: [], rushTimer: null, answerTimer: null
-                        };
+                        gameState.rush = { roundState: 'IDLE', currentQuestion: null, rushEndTime: 0, answerEndTime: 0, buzzerPlayerId: null, buzzerPlayerName: null, correctAnswer: null, usedQuestionIds: [], rushTimer: null, answerTimer: null };
                     } else {
                         gameState.currentActivity = 'mutual';
-                        // 初始化互问互答：找到第一个活跃队伍作为抽题和答题起始
-                        const activeTeams = getActiveTeams();
-                        if (activeTeams.length > 0) {
-                            const firstActiveId = activeTeams[0].id;
+                        const active = getActiveTeams();
+                        if (active.length > 0) {
+                            const firstId = active[0].id;
                             gameState.mutual = {
-                                currentDrawTeamId: firstActiveId,
-                                currentAnswerTeamId: getNextActiveTeam(firstActiveId + 1) || firstActiveId,
+                                currentDrawTeamId: firstId,
+                                currentAnswerTeamId: getNextActiveTeam(firstId + 1) || firstId,
                                 currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null,
-                                roundActive: false, teamAnswerCount: new Array(gameState.players.length).fill(0),
+                                roundActive: false, teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0),
                                 phaseEnded: false, usedQuestionIds: [], answerTimer: null
                             };
                         } else {
-                            gameState.mutual = {
-                                currentDrawTeamId: 0, currentAnswerTeamId: 0,
-                                currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null,
-                                roundActive: false, teamAnswerCount: new Array(gameState.players.length).fill(0),
-                                phaseEnded: true, usedQuestionIds: [], answerTimer: null
-                            };
+                            gameState.mutual = { currentDrawTeamId: 0, currentAnswerTeamId: 0, currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null, roundActive: false, teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0), phaseEnded: true, usedQuestionIds: [], answerTimer: null };
                         }
                     }
                     gameState.lastBuzzWinner = null;
@@ -444,12 +376,9 @@ wss.on('connection', (ws) => {
                     startRushTimeout();
                     broadcastState();
                 } else if (action === 'skipRush') {
-                    if (gameState.currentActivity === 'rush' && (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING')) {
-                        skipCurrentRush();
-                    }
+                    if (gameState.currentActivity === 'rush' && (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING')) skipCurrentRush();
                 } else if (action === 'drawQuestion') {
-                    if (gameState.currentActivity !== 'mutual') return;
-                    if (gameState.mutual.roundActive || gameState.mutual.phaseEnded) return;
+                    if (gameState.currentActivity !== 'mutual' || gameState.mutual.roundActive || gameState.mutual.phaseEnded) return;
                     if (payload.drawTeamId !== gameState.mutual.currentDrawTeamId) return;
                     if (MUTUAL_QUESTIONS.length === 0) return;
                     clearMutualTimer();
@@ -465,37 +394,25 @@ wss.on('connection', (ws) => {
                 }
             } else if (data.type === 'PLAYER_RUSH') {
                 const rush = gameState.rush;
-                if (gameState.currentActivity !== 'rush') return;
-                if (rush.roundState !== 'RUSHING') return;
-                if (rush.buzzerPlayerId !== null) return;
+                if (gameState.currentActivity !== 'rush' || rush.roundState !== 'RUSHING' || rush.buzzerPlayerId !== null) return;
                 if (Date.now() > rush.rushEndTime) return;
                 clearRushTimers();
                 rush.buzzerPlayerId = data.playerId;
                 rush.buzzerPlayerName = data.playerName;
                 const player = gameState.players.find(p => p.id === data.playerId);
-                gameState.lastBuzzWinner = {
-                    teamId: player.id,
-                    teamName: player.name,
-                    playerName: data.playerName,
-                    timestamp: Date.now(),
-                };
+                gameState.lastBuzzWinner = { teamId: player.id, teamName: player.name, playerName: data.playerName, timestamp: Date.now() };
                 rush.roundState = 'ANSWERING';
                 rush.answerEndTime = Date.now() + 6000;
                 startAnswerTimeout();
                 broadcastState();
                 setTimeout(() => {
-                    if (gameState.lastBuzzWinner && gameState.lastBuzzWinner.teamId === player.id) {
-                        gameState.lastBuzzWinner = null;
-                        broadcastState();
-                    }
+                    if (gameState.lastBuzzWinner?.teamId === player.id) gameState.lastBuzzWinner = null;
+                    broadcastState();
                 }, 4000);
             } else if (data.type === 'PLAYER_ANSWER') {
                 let result;
-                if (gameState.currentActivity === 'rush') {
-                    result = handleRushAnswer(data.playerId, data.playerName, data.answerIndex);
-                } else {
-                    result = handleMutualAnswer(data.playerId, data.playerName, data.answerIndex);
-                }
+                if (gameState.currentActivity === 'rush') result = handleRushAnswer(data.playerId, data.playerName, data.answerIndex);
+                else result = handleMutualAnswer(data.playerId, data.playerName, data.answerIndex);
                 if (result) ws.send(JSON.stringify({ type: 'ANSWER_RESULT', result }));
             }
         } catch(e) { console.error(e); }
@@ -503,6 +420,4 @@ wss.on('connection', (ws) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
