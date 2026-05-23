@@ -39,8 +39,25 @@
         .big-buzz-btn.disabled { opacity: 0.4; pointer-events: none; background: #555; }
         .login-panel { background: #111827; border-radius: 32px; padding: 32px; max-width: 480px; margin: 10vh auto; text-align: center; }
         .input-group { margin: 16px 0; text-align: left; }
-        .input-group label { display: block; margin-bottom: 6px; }
-        select, input { width: 100%; padding: 12px; border-radius: 40px; border: 1px solid #334155; background: #1e293b; color: white; font-size: 1rem; }
+        .input-group label { display: block; margin-bottom: 6px; color: #cbd5e1; }
+        /* 关键修复：强制输入框可聚焦、可输入 */
+        select, input, textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 40px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: white;
+            font-size: 1rem;
+            pointer-events: auto !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            touch-action: manipulation !important;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #f0c040;
+        }
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #f0c040; padding: 8px 20px; border-radius: 30px; z-index: 2000; animation: fadeOut 2s forwards; }
         @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
     </style>
@@ -52,10 +69,10 @@
     const urlParams = new URLSearchParams(window.location.search);
     const role = urlParams.get('role'); // 'host' 或 'player'
     let ws = null;
-    let currentPlayer = null; // 选手信息 { id, name }
+    let currentPlayer = null;
     let gameState = null;
 
-    // ==================== WebSocket 连接（自适应 wss/ws） ====================
+    // ==================== WebSocket 连接 ====================
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
     function connectWebSocket() {
@@ -76,19 +93,17 @@
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
     }
 
-    // 主持人发送状态更新
     function hostUpdate(updates) {
         Object.assign(gameState, updates);
         sendMessage({ type: 'HOST_ACTION', state: gameState });
     }
 
-    // 获取当前题目
     function getCurrentQ() {
         if (!gameState || gameState.currentQIndex >= gameState.questions.length) return null;
         return gameState.questions[gameState.currentQIndex];
     }
 
-    // ==================== 主持人界面渲染 ====================
+    // ==================== 主持人界面（简化，与之前相同）====================
     function renderHost() {
         const q = getCurrentQ();
         const qStatus = q ? gameState.questionStatus[q.id] : null;
@@ -110,9 +125,6 @@
         let stageClass = '';
         if (round === 'READY_TO_BUZZ') stageClass = 'state-ready';
         else if (round === 'BUZZED') stageClass = 'state-buzzed';
-        else if (round === 'JUDGED') {
-            // 简单根据最后判定显示，实际可省略
-        }
 
         const html = `
             <div class="host-layout">
@@ -140,7 +152,6 @@
         `;
         document.getElementById('app').innerHTML = html;
 
-        // 渲染选项
         if (q && q.options) {
             const optsDiv = document.getElementById('hostOptions');
             const labels = q.type === '判断题' ? ['✅ 正确','❌ 错误'] : ['A','B','C','D'].slice(0, q.options.length);
@@ -151,7 +162,6 @@
             }
         }
 
-        // 队伍积分榜
         const teamsGrid = document.getElementById('hostTeamsGrid');
         teamsGrid.innerHTML = gameState.players.map(p => `
             <div class="team-card-host" style="border-left-color:${p.color}">
@@ -160,7 +170,6 @@
             </div>
         `).join('');
 
-        // 题目导航
         const navDiv = document.getElementById('hostNav');
         navDiv.innerHTML = gameState.questions.map((_, i) => {
             let cls = '';
@@ -171,11 +180,7 @@
             return `<button class="btn ${cls}" style="padding:4px 12px;" data-idx="${i}">${i+1}</button>`;
         }).join('');
 
-        // 绑定事件
-        document.getElementById('showQBtn').onclick = () => {
-            if (!q || isQDone) return;
-            hostUpdate({ roundState: 'SHOWING' });
-        };
+        document.getElementById('showQBtn').onclick = () => { if (q && !isQDone) hostUpdate({ roundState: 'SHOWING' }); };
         document.getElementById('startBuzzBtn').onclick = () => {
             if (round !== 'SHOWING') return;
             hostUpdate({ roundState: 'READY_TO_BUZZ', buzzRemain: gameState.buzzTimeoutSec });
@@ -185,12 +190,8 @@
                 if (gameState.roundState !== 'READY_TO_BUZZ') { clearInterval(timer); return; }
                 const elapsed = (Date.now() - start) / 1000;
                 let rem = Math.max(0, gameState.buzzTimeoutSec - elapsed);
-                if (rem <= 0) {
-                    clearInterval(timer);
-                    hostUpdate({ roundState: 'TIMEOUT' });
-                } else {
-                    hostUpdate({ buzzRemain: rem });
-                }
+                if (rem <= 0) { clearInterval(timer); hostUpdate({ roundState: 'TIMEOUT' }); }
+                else hostUpdate({ buzzRemain: rem });
             }, 100);
         };
         document.getElementById('correctBtn').onclick = () => {
@@ -201,11 +202,9 @@
                 if (q && !gameState.questionStatus[q.id]) gameState.questionStatus[q.id] = 'done';
                 hostUpdate({ roundState: 'JUDGED', players: gameState.players, questionStatus: gameState.questionStatus });
                 setTimeout(() => {
-                    if (gameState.currentQIndex < gameState.questions.length - 1) {
+                    if (gameState.currentQIndex < gameState.questions.length - 1)
                         hostUpdate({ currentQIndex: gameState.currentQIndex + 1, roundState: 'IDLE', buzzerPlayerId: null });
-                    } else {
-                        hostUpdate({ roundState: 'IDLE' });
-                    }
+                    else hostUpdate({ roundState: 'IDLE' });
                 }, 2000);
             }
         };
@@ -217,11 +216,9 @@
                 if (q && !gameState.questionStatus[q.id]) gameState.questionStatus[q.id] = 'done';
                 hostUpdate({ roundState: 'JUDGED', players: gameState.players, questionStatus: gameState.questionStatus });
                 setTimeout(() => {
-                    if (gameState.currentQIndex < gameState.questions.length - 1) {
+                    if (gameState.currentQIndex < gameState.questions.length - 1)
                         hostUpdate({ currentQIndex: gameState.currentQIndex + 1, roundState: 'IDLE', buzzerPlayerId: null });
-                    } else {
-                        hostUpdate({ roundState: 'IDLE' });
-                    }
+                    else hostUpdate({ roundState: 'IDLE' });
                 }, 2000);
             }
         };
@@ -234,13 +231,12 @@
         };
         document.getElementById('resetBtn').onclick = () => {
             if (confirm('重置所有分数和进度？')) {
-                location.reload();  // 简单重置：刷新页面，后端状态也会重置（因为内存存储）
+                location.reload();
             }
         };
         document.getElementById('logoutBtn').onclick = () => {
             window.location.href = window.location.pathname;
         };
-        // 导航点击
         document.querySelectorAll('#hostNav button').forEach(btn => {
             btn.onclick = () => {
                 const idx = parseInt(btn.dataset.idx);
@@ -253,14 +249,14 @@
         });
     }
 
-    // ==================== 选手界面渲染 ====================
+    // ==================== 选手界面 ====================
     function renderPlayer() {
         if (!currentPlayer) return;
         const player = gameState.players.find(p => p.id === currentPlayer.id);
         if (!player) return;
         const q = getCurrentQ();
         const round = gameState.roundState;
-        const showQuestion = (round !== 'IDLE'); // 只要不是空闲状态就显示题目（包括 SHOWING 之后）
+        const showQuestion = (round !== 'IDLE');
         const canBuzz = (round === 'READY_TO_BUZZ');
 
         let questionDisplay = '<div style="text-align:center; padding:40px;">📢 等待主持人开始比赛...</div>';
@@ -332,7 +328,7 @@
                 <h1>🏆 知识竞赛</h1>
                 <div class="input-group">
                     <label>你的姓名</label>
-                    <input type="text" id="playerName" placeholder="请输入真实姓名" maxlength="20">
+                    <input type="text" id="playerName" placeholder="请输入真实姓名" maxlength="20" autocomplete="off">
                 </div>
                 <div class="input-group">
                     <label>选择队伍</label>
@@ -344,6 +340,7 @@
             </div>
         `;
         document.getElementById('app').innerHTML = html;
+        // 绑定事件时确保输入框可以聚焦
         document.getElementById('joinBtn').onclick = () => {
             const name = document.getElementById('playerName').value.trim();
             if (!name) { alert('请输入姓名'); return; }
@@ -351,6 +348,14 @@
             currentPlayer = { id: teamId, name: name };
             render();
         };
+        // 额外：确保输入框可点击
+        const nameInput = document.getElementById('playerName');
+        if (nameInput) {
+            nameInput.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                nameInput.focus();
+            });
+        }
     }
 
     // ==================== 主渲染分发 ====================
@@ -365,7 +370,6 @@
                 renderLogin();
             }
         } else {
-            // 无角色参数，显示选择
             document.getElementById('app').innerHTML = `
                 <div class="login-panel">
                     <h1>🏆 知识竞赛</h1>
@@ -381,9 +385,8 @@
         }
     }
 
-    // 启动
     connectWebSocket();
-    setInterval(() => { if (gameState) render(); }, 200); // 定期刷新 UI 同步状态
+    setInterval(() => { if (gameState) render(); }, 200);
 </script>
 </body>
 </html>
