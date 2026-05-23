@@ -77,27 +77,30 @@
     function sendMessage(msg) { if(ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 
     function startLocalTimers() {
-        if(intervalId) clearInterval(intervalId);
-        intervalId = setInterval(() => {
-            if(!gameState) return;
-            const act = gameState.currentActivity;
-            if(act==='rush') {
-                const r = gameState.rush;
-                const el = document.getElementById('rushTimer');
-                if(el) {
-                    if(r.roundState==='RUSHING' && r.rushEndTime) el.textContent = `⏰ 抢答倒计时: ${Math.max(0,(r.rushEndTime-Date.now())/1000).toFixed(1)} 秒`;
-                    else if(r.roundState==='ANSWERING' && r.answerEndTime) el.textContent = `✏️ 答题倒计时: ${Math.max(0,(r.answerEndTime-Date.now())/1000).toFixed(1)} 秒`;
-                    else el.textContent = '';
-                }
-            } else if(act==='mutual') {
-                const m = gameState.mutual;
-                const el = document.getElementById('mutualTimer');
-                if(el && m.roundActive && m.answerEndTime) el.textContent = `⌛ 答题倒计时: ${Math.max(0,(m.answerEndTime-Date.now())/1000).toFixed(1)} 秒`;
-                else if(el) el.textContent = '';
-            }
-        }, 100);
-    }
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(() => {
+        if (!gameState) return;
+        const now = Date.now();
+        const elapsed = now - lastBroadcastTime;
+        const rushDisplay = Math.max(0, (localRushRemaining - elapsed) / 1000).toFixed(1);
+        const mutualDisplay = Math.max(0, (localMutualRemaining - elapsed) / 1000).toFixed(1);
 
+        const rushEl = document.getElementById('rushTimer');
+        const mutualEl = document.getElementById('mutualTimer');
+        if (rushEl && gameState.currentActivity === 'rush') {
+            if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
+                rushEl.textContent = `⏰ 抢答倒计时: ${rushDisplay} 秒`;
+            } else {
+                rushEl.textContent = '';
+            }
+        }
+        if (mutualEl && gameState.currentActivity === 'mutual' && gameState.mutual.roundActive) {
+            mutualEl.textContent = `⌛ 答题倒计时: ${mutualDisplay} 秒`;
+        } else if (mutualEl) {
+            mutualEl.textContent = '';
+        }
+    }, 100);
+   }
     function connectWebSocket() {
         ws = new WebSocket(wsUrl);
         ws.onopen = () => console.log('WS connected');
