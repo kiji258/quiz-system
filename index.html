@@ -3,43 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>安全知识竞赛 - 完整功能版</title>
+    <title>安全知识竞赛 - 完整版</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
         body { font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif; background:#0b0f17; color:#e2e8f0; padding:16px; }
-        .container { max-width:1400px; margin:0 auto; }
-        .hidden { display:none !important; }
         .btn { padding:8px 18px; border-radius:40px; font-weight:bold; border:none; cursor:pointer; transition:0.1s; }
         .btn-primary { background:#f0c040; color:#1e1a0a; }
+        .btn-outline { background:transparent; border:1px solid #64748b; color:#cbd5e1; }
         .btn-danger { background:#ef4444; color:white; }
         .btn-success { background:#10b981; color:white; }
-        .btn-outline { background:transparent; border:1px solid #64748b; color:#cbd5e1; }
-        .btn:active { transform:scale(0.96); }
-        .login-panel, .admin-panel, .host-panel, .player-panel { background:#111827; border-radius:32px; padding:24px; margin-bottom:20px; }
+        .login-panel, .host-panel, .player-panel, .admin-panel { background:#111827; border-radius:32px; padding:24px; margin-bottom:20px; }
         .team-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:10px; margin-top:16px; }
-        .team-card { background:#1a1f2e; border-radius:20px; padding:8px; text-align:center; border-left:4px solid; transition:0.2s; }
-        .team-card.highlight { transform:scale(1.02); box-shadow:0 0 0 2px #f0c040; background:#2d3a5e; }
+        .team-card { background:#1a1f2e; border-radius:20px; padding:8px; text-align:center; border-left:4px solid; }
         .score-big { font-size:2rem; font-weight:800; }
         .question-area { background:#0f172a; border-radius:28px; padding:20px; margin:16px 0; }
-        .q-text { font-size:2.5rem; font-weight:700; margin:12px 0; word-break:break-word; line-height:1.3; }
+        .q-text { font-size:2.8rem; font-weight:700; margin:12px 0; word-break:break-word; line-height:1.3; }
         .options { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
-        .option { background:#1e293b; border-radius:60px; padding:14px 20px; font-size:1.3rem; cursor:pointer; transition:0.1s; }
+        .option { background:#1e293b; border-radius:60px; padding:14px 20px; font-size:1.4rem; cursor:pointer; transition:0.1s; }
         .option:active { transform:scale(0.98); background:#334155; }
-        .option.disabled { opacity:0.5; pointer-events:none; }
         .buzz-btn { background:radial-gradient(circle at 30%20%, #f0c040, #d97706); border:none; border-radius:120px; padding:20px; font-size:2rem; font-weight:900; width:100%; margin:20px 0; cursor:pointer; }
         .buzz-btn.disabled { opacity:0.5; pointer-events:none; }
         .timer { font-size:1.8rem; font-weight:bold; color:#f0c040; text-align:center; margin:10px 0; font-family: monospace; background:#00000066; padding:8px; border-radius:60px; }
-        .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:3px solid #f0c040; padding:12px 28px; border-radius:60px; z-index:2000; animation:fadeOut 3s forwards; font-weight:bold; font-size:1.2rem; box-shadow:0 0 20px rgba(0,0,0,0.5); color:#fde68a; }
-        @keyframes fadeOut { 0%{opacity:1; transform:translateX(-50%) translateY(0);} 80%{opacity:1;} 100%{opacity:0; transform:translateX(-50%) translateY(-20px); visibility:hidden;} }
-        .score-table { width:100%; border-collapse:collapse; }
-        .score-table th, .score-table td { border:1px solid #334155; padding:8px; text-align:center; }
+        .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:3px solid #f0c040; padding:12px 28px; border-radius:60px; z-index:2000; animation:fadeOut 3s forwards; font-weight:bold; font-size:1.2rem; }
+        @keyframes fadeOut { 0%{opacity:1;} 100%{opacity:0;visibility:hidden;} }
+        .result-banner { text-align:center; padding:20px; margin:16px 0; border-radius:60px; font-weight:900; font-size:2rem; animation: fadeOutResult 4s forwards; }
+        .result-banner.correct { background:#10b981; color:white; border:4px solid #f0c040; }
+        .result-banner.wrong { background:#ef4444; color:white; border:4px solid #f0c040; }
+        .result-banner.buzz { background:#f0c040; color:#1e1a0a; font-size:2.2rem; }
+        @keyframes fadeOutResult {
+            0% { opacity:1; transform:scale(1); }
+            80% { opacity:1; transform:scale(1); }
+            100% { opacity:0; transform:scale(0.9); visibility:hidden; }
+        }
         .phase-tip { font-size:1.5rem; font-weight:bold; text-align:center; margin:8px 0; color:#f0c040; }
-        @keyframes blink { 0% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.98); background:#f0c040; color:#1a1a1a; } 100% { opacity:1; transform:scale(1); } }
-        .blink-animation { animation: blink 0.5s ease-in-out 2; }
-        .upload-area { margin:16px 0; padding:12px; border:2px dashed #64748b; border-radius:28px; text-align:center; cursor:pointer; }
-        .upload-area:hover { border-color:#f0c040; background:#1e293b; }
-        .result-banner { background:#f0c04020; border:2px solid #f0c040; border-radius:60px; padding:12px; margin:10px 0; text-align:center; font-size:1.3rem; font-weight:bold; animation: pulse 0.5s; }
-        @keyframes pulse { 0% { transform:scale(1); } 50% { transform:scale(1.02); background:#f0c04040; } }
+        table { width:100%; border-collapse:collapse; margin-top:16px; background:#0f172a; }
+        th, td { border:1px solid #334155; padding:8px; text-align:center; vertical-align:middle; }
+        input, select, textarea { background:#1e293b; border:1px solid #475569; color:white; padding:8px; border-radius:20px; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000; }
+        .modal-card { background:#111827; border-radius:32px; padding:24px; width:90%; max-width:500px; }
     </style>
 </head>
 <body>
@@ -52,11 +53,12 @@
         let gameState = null;
         let currentPlayer = null;
         let timerInterval = null;
-        let isRendering = false;
+        let currentAdminTab = 'rush'; // 'rush', 'mutual', 'history'
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${location.host}`;
 
+        // ---------- 辅助函数 ----------
         function hasActiveCountdown() {
             if (!gameState) return false;
             if (gameState.currentActivity === 'rush') {
@@ -70,43 +72,24 @@
             return false;
         }
 
-        function scheduleRender() {
-            if (isRendering) return;
-            isRendering = true;
-            requestAnimationFrame(() => {
-                render();
-                isRendering = false;
-            });
-        }
-
-        function manageCountdownTimer() {
+        function scheduleRender() { requestAnimationFrame(() => render()); }
+        function manageTimer() {
             if (hasActiveCountdown()) {
                 if (!timerInterval) {
                     timerInterval = setInterval(() => {
-                        if (hasActiveCountdown()) {
-                            scheduleRender();
-                            if (gameState && gameState.currentActivity === 'rush') {
-                                const rush = gameState.rush;
-                                if (rush.roundState === 'ANSWERING' && rush.answerEndTime && Date.now() > rush.answerEndTime) {
-                                    sendMessage({ type: 'PLAYER_TIMEOUT' });
-                                    clearInterval(timerInterval);
-                                    timerInterval = null;
-                                } else if (rush.roundState === 'RUSHING' && rush.rushEndTime && Date.now() > rush.rushEndTime) {
-                                    sendMessage({ type: 'RUSH_TIMEOUT' });
-                                    clearInterval(timerInterval);
-                                    timerInterval = null;
-                                }
-                            } else if (gameState && gameState.currentActivity === 'mutual') {
-                                const mutual = gameState.mutual;
-                                if (mutual.roundActive && mutual.answerEndTime && Date.now() > mutual.answerEndTime) {
-                                    sendMessage({ type: 'PLAYER_TIMEOUT' });
-                                    clearInterval(timerInterval);
-                                    timerInterval = null;
-                                }
-                            }
-                        } else {
-                            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                            scheduleRender();
+                        if (hasActiveCountdown()) scheduleRender();
+                        else { clearInterval(timerInterval); timerInterval = null; scheduleRender(); }
+                        // 超时检测
+                        if (gameState && gameState.currentActivity === 'rush') {
+                            const rush = gameState.rush;
+                            if (rush.roundState === 'ANSWERING' && rush.answerEndTime && Date.now() > rush.answerEndTime)
+                                sendMessage({ type: 'PLAYER_TIMEOUT' });
+                            else if (rush.roundState === 'RUSHING' && rush.rushEndTime && Date.now() > rush.rushEndTime)
+                                sendMessage({ type: 'RUSH_TIMEOUT' });
+                        } else if (gameState && gameState.currentActivity === 'mutual') {
+                            const mutual = gameState.mutual;
+                            if (mutual.roundActive && mutual.answerEndTime && Date.now() > mutual.answerEndTime)
+                                sendMessage({ type: 'PLAYER_TIMEOUT' });
                         }
                     }, 100);
                 }
@@ -123,24 +106,16 @@
                 if (data.type === 'STATE') {
                     gameState = data.state;
                     scheduleRender();
-                    manageCountdownTimer();
+                    manageTimer();
                 } else if (data.type === 'ANSWER_RESULT') {
                     showToast(data.result.msg);
                     scheduleRender();
-                    manageCountdownTimer();
-                } else if (data.type === 'EVENT') {
-                    if (data.eventType === 'BUZZ') showToast(data.payload.msg);
-                    scheduleRender();
+                    manageTimer();
                 }
             };
             ws.onclose = () => setTimeout(connectWebSocket, 3000);
-            ws.onerror = (err) => console.error('WebSocket error', err);
         }
-
-        function sendMessage(msg) {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-        }
-
+        function sendMessage(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
         function showToast(msg) {
             let t = document.createElement('div');
             t.className = 'toast';
@@ -149,7 +124,7 @@
             setTimeout(() => t.remove(), 3000);
         }
 
-        // ---------- HTTP API 调用（管理员题库管理）----------
+        // ---------- HTTP API ----------
         async function apiGet(url) { const res = await fetch(url); return res.json(); }
         async function apiPost(url, data) { return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(r=>r.json()); }
         async function apiPut(url, data) { return fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(r=>r.json()); }
@@ -171,249 +146,170 @@
                     </div>
                 </div>
             `;
-            document.getElementById('hostBtn').onclick = () => showPassword('host');
-            document.getElementById('adminBtn').onclick = () => showPassword('admin');
+            let targetRole = null;
+            document.getElementById('hostBtn').onclick = () => { targetRole='host'; document.getElementById('passwordDiv').classList.remove('hidden'); };
+            document.getElementById('adminBtn').onclick = () => { targetRole='admin'; document.getElementById('passwordDiv').classList.remove('hidden'); };
             document.getElementById('playerBtn').onclick = () => { window.location.href = '?role=player'; };
-            function showPassword(r) {
-                const div = document.getElementById('passwordDiv');
-                div.classList.remove('hidden');
-                document.getElementById('submitPwd').onclick = () => {
-                    const pwd = document.getElementById('password').value;
-                    if (pwd === '123') window.location.href = `?role=${r}`;
-                    else alert('密码错误');
-                };
-            }
+            document.getElementById('submitPwd').onclick = () => {
+                const pwd = document.getElementById('password').value;
+                if (pwd === '123') window.location.href = `?role=${targetRole}`;
+                else alert('密码错误');
+            };
         }
 
-        // ---------- 主持人界面（含抢答者、结果横幅）----------
+        // ---------- 主持人界面 ----------
         function renderHost() {
             if (!gameState) return;
             const act = gameState.currentActivity;
             const rush = gameState.rush;
             const mutual = gameState.mutual;
-            let resultBanner = '';
-            if (gameState.lastBuzzWinner) {
-                resultBanner = `<div class="result-banner">🏆 抢答成功：${gameState.lastBuzzWinner.teamName} 队！🏆</div>`;
-            } else if (gameState.lastAnswerResult) {
-                const r = gameState.lastAnswerResult;
-                resultBanner = `<div class="result-banner" style="border-color:${r.isCorrect?'#10b981':'#ef4444'}">${r.message}</div>`;
+            let resultHtml = '';
+            if (gameState.lastBuzzWinner && gameState.lastBuzzWinner.timestamp + 4000 > Date.now()) {
+                resultHtml += `<div class="result-banner buzz">🏆 抢答成功：${gameState.lastBuzzWinner.teamName} 队！🏆</div>`;
+            }
+            if (gameState.lastAnswerResult && gameState.lastAnswerResult.timestamp && gameState.lastAnswerResult.timestamp + 4000 > Date.now()) {
+                const cls = gameState.lastAnswerResult.isCorrect ? 'correct' : 'wrong';
+                resultHtml += `<div class="result-banner ${cls}">${gameState.lastAnswerResult.message}</div>`;
             }
             let content = `
                 <div class="host-panel">
-                    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; justify-content:space-between;">
                         <h2>🎙️ 主持人控制台</h2>
-                        <div><button class="btn btn-outline" id="logoutBtn">退出</button></div>
+                        <button class="btn btn-outline" id="logoutBtn">退出</button>
                     </div>
-                    <div style="margin:16px 0; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">🏁 抢答活动</button>
-                        <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">🔄 互问互答</button>
+                    <div style="margin:16px 0; display:flex; gap:10px;">
+                        <button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">抢答活动</button>
+                        <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">互问互答</button>
                     </div>
-                    <div class="phase-tip">📌 当前阶段：${act==='rush'?'抢答竞赛':'互问互答'}</div>
-                    ${resultBanner}
+                    <div class="phase-tip">当前阶段：${act==='rush'?'抢答竞赛':'互问互答'}</div>
+                    ${resultHtml}
             `;
             if (act === 'rush') {
-                let timerDisplay = '';
+                let timer = '';
                 if (rush.roundState === 'RUSHING' && rush.rushEndTime) {
                     const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
-                    timerDisplay = `<div class="timer">⏰ 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    timer = `<div class="timer">⏰ 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
                 } else if (rush.roundState === 'ANSWERING' && rush.answerEndTime) {
                     const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
-                    timerDisplay = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    timer = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
                 }
                 content += `
                     <div class="question-area">
                         <div>状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
                         ${rush.currentQuestion ? `<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>` : '<div>暂无题目</div>'}
-                        ${timerDisplay}
-                        <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>🎲 开始抢答 (40秒)</button>
+                        ${timer}
+                        <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button>
                     </div>
                 `;
-            } else if (act === 'mutual') {
+            } else {
                 const currentDraw = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
                 const currentAnswer = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
-                let answerTimer = '';
+                let timer = '';
                 if (mutual.roundActive && mutual.answerEndTime) {
                     const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
-                    answerTimer = `<div class="timer">⏰ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    timer = `<div class="timer">⏰ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
                 }
                 content += `
                     <div class="question-area">
-                        <div class="phase-tip" style="font-size:1.2rem;">🎲 抽题队伍：${currentDraw?.name} &nbsp;&nbsp; 🎯 答题队伍：${currentAnswer?.name}</div>
-                        ${mutual.roundActive ? `<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>${answerTimer}` : '<div>未开始一轮问答，请当前抽题队伍点击抽取题目</div>'}
-                        <button class="btn btn-primary" id="drawQuestionBtn" ${mutual.roundActive ? 'disabled' : ''}>📖 抽取题目 (轮到抽题队时有效)</button>
+                        <div class="phase-tip" style="font-size:1.2rem;">🎲 抽题队伍：${currentDraw?.name} &nbsp; 🎯 答题队伍：${currentAnswer?.name}</div>
+                        ${mutual.roundActive ? `<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>${timer}` : '<div>未开始，请抽题队伍抽取题目</div>'}
+                        <button class="btn btn-primary" id="drawBtn" ${mutual.roundActive ? 'disabled' : ''}>📖 抽取题目</button>
                     </div>
                 `;
             }
-            content += `<div class="team-grid" id="hostTeamScores"></div></div>`;
+            content += `<div class="team-grid" id="hostScores"></div></div>`;
             document.getElementById('app').innerHTML = content;
-
-            const grid = document.getElementById('hostTeamScores');
-            if (grid) grid.innerHTML = gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('');
-
-            document.getElementById('selectRush').onclick = () => {
-                if (gameState.currentActivity !== 'rush' && confirm('确认切换到抢答活动？当前互问互答进度将重置')) {
-                    sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'rush' });
-                }
-            };
-            document.getElementById('selectMutual').onclick = () => {
-                if (gameState.currentActivity !== 'mutual' && confirm('确认切换到互问互答活动？当前抢答活动进度将重置')) {
-                    sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'mutual' });
-                }
-            };
-            if (act === 'rush') {
-                document.getElementById('startRushBtn').onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'startRush' });
-            } else if (act === 'mutual') {
-                const drawBtn = document.getElementById('drawQuestionBtn');
-                drawBtn.onclick = () => {
-                    const drawTeamId = gameState.mutual.currentDrawTeamId;
-                    drawBtn.classList.add('blink-animation');
-                    setTimeout(() => drawBtn.classList.remove('blink-animation'), 600);
-                    sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId } });
-                };
-            }
+            document.getElementById('hostScores').innerHTML = gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('');
+            document.getElementById('selectRush').onclick = () => { if (gameState.currentActivity !== 'rush' && confirm('切换到抢答活动？')) sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'rush' }); };
+            document.getElementById('selectMutual').onclick = () => { if (gameState.currentActivity !== 'mutual' && confirm('切换到互问互答？')) sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'mutual' }); };
+            if (act === 'rush') document.getElementById('startRushBtn').onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'startRush' });
+            else document.getElementById('drawBtn').onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId: gameState.mutual.currentDrawTeamId } });
             document.getElementById('logoutBtn').onclick = () => { window.location.href = '/'; };
         }
 
-        // ---------- 选手登录界面 ----------
+        // ---------- 选手界面 ----------
         function renderPlayerLogin() {
             if (!gameState) return;
             const teams = gameState.players;
             document.getElementById('app').innerHTML = `
                 <div class="login-panel" style="max-width:400px; margin:10vh auto;">
                     <h2>选手登录</h2>
-                    <div style="margin:16px 0;">
-                        <label>姓名</label>
-                        <input type="text" id="playerName" placeholder="请输入真实姓名" style="width:100%; padding:12px; border-radius:40px;">
-                    </div>
-                    <div style="margin:16px 0;">
-                        <label>队伍</label>
-                        <select id="teamSelect" style="width:100%; padding:12px; border-radius:40px;">${teams.map(t=>`<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('')}</select>
-                    </div>
+                    <div><input id="playerName" placeholder="姓名" style="width:100%; padding:12px; margin:10px 0;"></div>
+                    <div><select id="teamSelect" style="width:100%; padding:12px;">${teams.map(t=>`<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('')}</select></div>
                     <button class="btn btn-primary" id="joinBtn">进入赛场</button>
                 </div>
             `;
             document.getElementById('joinBtn').onclick = () => {
                 const name = document.getElementById('playerName').value.trim();
-                if (!name) { alert('请输入姓名'); return; }
+                if (!name) return alert('请输入姓名');
                 const teamId = parseInt(document.getElementById('teamSelect').value);
                 currentPlayer = { id: teamId, name };
                 scheduleRender();
             };
         }
-                // 选手主界面
         function renderPlayerMain() {
-            if (!currentPlayer || !gameState) return;
             const player = gameState.players.find(p => p.id === currentPlayer.id);
             if (!player) return;
             const act = gameState.currentActivity;
             const rush = gameState.rush;
             const mutual = gameState.mutual;
-            let canBuzz = false, canAnswer = false, showBuzzBtn = (act === 'rush');
-            let questionHtml = '<div>等待主持人开始活动...</div>';
-            let optionsHtml = '', timerHtml = '', specialMsg = '';
-            let phaseTip = act==='rush'?'⚡ 抢答活动 ⚡':'🤝 互问互答 🤝';
-
+            let canBuzz = false, canAnswer = false, showBuzz = (act === 'rush');
+            let qHtml = '<div>等待主持人开始...</div>', optHtml = '', timerHtml = '', special = '';
             if (act === 'rush') {
                 if (rush.currentQuestion && rush.roundState !== 'IDLE') {
-                    questionHtml = `<div class="q-text">${rush.currentQuestion.question}</div>`;
-                    optionsHtml = `<div class="options" id="optionsContainer">${rush.currentQuestion.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
+                    qHtml = `<div class="q-text">${rush.currentQuestion.question}</div>`;
+                    optHtml = `<div class="options" id="opts">${rush.currentQuestion.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
                     canBuzz = (rush.roundState === 'RUSHING' && rush.buzzerPlayerId === null);
-                    const isAnsweringForMe = (rush.roundState === 'ANSWERING' && rush.buzzerPlayerId === player.id);
-                    canAnswer = isAnsweringForMe;
-                    if (rush.roundState === 'RUSHING' && rush.rushEndTime) {
-                        const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
-                        timerHtml = `<div class="timer">🔔 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
-                    }
-                    if (isAnsweringForMe && rush.answerEndTime) {
-                        const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
-                        timerHtml = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
-                    }
-                    if (rush.buzzerPlayerId !== null && rush.buzzerPlayerId !== player.id) {
-                        const buzzer = gameState.players.find(p=>p.id===rush.buzzerPlayerId);
-                        specialMsg = `<div style="color:#f0c040;">⚠️ ${buzzer?.name} 已抢答，正在答题中...</div>`;
-                    }
-                } else {
-                    questionHtml = '<div>等待主持人开始抢答...</div>';
-                }
-            } else if (act === 'mutual') {
-                if (mutual.phaseEnded) {
-                    specialMsg = '<div class="phase-tip" style="color:#10b981;">🏆 互问互答阶段已结束！</div>';
-                } else if (mutual.roundActive) {
-                    const isAnsweringTeam = (mutual.answeringPlayerId === player.id);
-                    questionHtml = `<div class="q-text">${mutual.currentQuestion?.question}</div>`;
-                    const opts = mutual.currentQuestion?.options || [];
-                    optionsHtml = `<div class="options" id="optionsContainer">${opts.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
-                    if (isAnsweringTeam && mutual.answerEndTime) {
-                        const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
-                        timerHtml = `<div class="timer">⌛ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    if (rush.roundState === 'RUSHING') timerHtml = `<div class="timer">🔔 抢答倒计时: ${Math.max(0,(rush.rushEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
+                    if (rush.roundState === 'ANSWERING' && rush.buzzerPlayerId === player.id) {
+                        timerHtml = `<div class="timer">✏️ 答题倒计时: ${Math.max(0,(rush.answerEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
                         canAnswer = true;
-                        specialMsg = '<div style="color:#10b981;">🎤 轮到你的队伍回答！点击选项提交答案</div>';
-                    } else if (!isAnsweringTeam) {
-                        const answeringTeam = gameState.players.find(p=>p.id===mutual.answeringPlayerId);
-                        specialMsg = `<div>⏳ 当前由 ${answeringTeam?.name} 队伍回答</div>`;
+                    }
+                    if (rush.buzzerPlayerId && rush.buzzerPlayerId !== player.id) {
+                        const b = gameState.players.find(p=>p.id===rush.buzzerPlayerId);
+                        special = `<div>⚠️ ${b?.name} 已抢答</div>`;
+                    }
+                }
+            } else {
+                if (mutual.roundActive) {
+                    const isAnswer = (mutual.answeringPlayerId === player.id);
+                    qHtml = `<div class="q-text">${mutual.currentQuestion?.question}</div>`;
+                    optHtml = `<div class="options" id="opts">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
+                    if (isAnswer) {
+                        timerHtml = `<div class="timer">⌛ 答题倒计时: ${Math.max(0,(mutual.answerEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
+                        canAnswer = true;
+                        special = '<div style="color:#10b981;">🎤 轮到你们队回答！</div>';
+                    } else {
+                        const ans = gameState.players.find(p=>p.id===mutual.answeringPlayerId);
+                        special = `<div>⏳ ${ans?.name} 正在回答</div>`;
                     }
                 } else {
-                    const currentDraw = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
-                    const nextAnswer = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
-                    specialMsg = `<div>抽题队伍: ${currentDraw?.name} | 答题队伍: ${nextAnswer?.name}</div>`;
-                    if (mutual.currentDrawTeamId === player.id) {
-                        specialMsg += `<button class="btn btn-primary" id="drawBtn" style="margin-top:8px;">📖 抽取题目</button>`;
-                    }
+                    const drawTeam = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
+                    special = `<div>抽题: ${drawTeam?.name} | 答题: ${gameState.players.find(p=>p.id===mutual.currentAnswerTeamId)?.name}</div>`;
+                    if (mutual.currentDrawTeamId === player.id) special += `<button class="btn btn-primary" id="drawBtn">📖 抽题</button>`;
                 }
             }
-
-            const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr)); margin-top:10px;">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}; padding:4px;"><div>${p.emoji}</div><div style="font-size:0.9rem;">${p.score}</div></div>`).join('')}</div>`;
-
+            const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr))">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}; padding:4px"><div>${p.emoji}</div><div>${p.score}</div></div>`).join('')}</div>`;
             const html = `
                 <div class="player-panel">
-                    <div style="display:flex; justify-content:space-between;">
-                        <h2>👤 ${player.emoji} ${player.name} (${currentPlayer.name})</h2>
-                        <button class="btn btn-outline" id="logoutBtn">退出</button>
-                    </div>
-                    <div class="phase-tip">${phaseTip}</div>
-                    <div class="question-area">
-                        ${questionHtml}
-                        ${optionsHtml}
-                        ${timerHtml}
-                        ${specialMsg}
-                    </div>
-                    ${showBuzzBtn ? `<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>` : ''}
+                    <div><h2>${player.emoji} ${player.name} (${currentPlayer.name})</h2><button class="btn btn-outline" id="logoutBtn">退出</button></div>
+                    <div class="phase-tip">${act==='rush'?'⚡抢答活动⚡':'🤝互问互答🤝'}</div>
+                    <div class="question-area">${qHtml}${optHtml}${timerHtml}${special}</div>
+                    ${showBuzz ? `<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>` : ''}
                     ${scoreBoard}
                 </div>
             `;
             document.getElementById('app').innerHTML = html;
-
-            if (showBuzzBtn && canBuzz) {
-                document.getElementById('buzzBtn').onclick = () => {
-                    sendMessage({ type: 'PLAYER_RUSH', playerId: player.id });
-                    document.getElementById('buzzBtn').disabled = true;
-                };
-            }
-            const optionsDiv = document.getElementById('optionsContainer');
-            if (optionsDiv && canAnswer) {
-                const opts = document.querySelectorAll('.option');
-                opts.forEach(opt => {
-                    opt.onclick = () => {
-                        const idx = parseInt(opt.dataset.opt);
-                        sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, answerIndex: idx });
-                        opts.forEach(o => o.classList.add('disabled'));
-                    };
-                });
-            }
+            if (showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({ type: 'PLAYER_RUSH', playerId: player.id });
+            const optsDiv = document.getElementById('opts');
+            if (optsDiv && canAnswer) document.querySelectorAll('.option').forEach(opt => opt.onclick = () => sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, answerIndex: parseInt(opt.dataset.opt) }));
             const drawBtn = document.getElementById('drawBtn');
-            if (drawBtn) {
-                drawBtn.onclick = () => {
-                    sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId: player.id } });
-                };
-            }
-            document.getElementById('logoutBtn').onclick = () => {
-                currentPlayer = null;
-                scheduleRender();
-            };
+            if (drawBtn) drawBtn.onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId: player.id } });
+            document.getElementById('logoutBtn').onclick = () => { currentPlayer = null; scheduleRender(); };
         }
 
-        // ---------- 管理员界面（题库管理 + 历史记录）----------
-        let currentAdminTab = 'rush';
+        // ---------- 管理员界面（完整实现：题库增删改查 + 历史记录 + 分数榜）----------
+        let editingQuestion = null;
         async function renderAdmin() {
             if (!gameState) return;
             const [rushQs, mutualQs, history] = await Promise.all([
@@ -421,23 +317,24 @@
                 apiGet('/api/mutual-questions'),
                 apiGet('/api/history')
             ]);
-            const qs = currentAdminTab === 'rush' ? rushQs : mutualQs;
-            const qType = currentAdminTab;
-            const html = `
+            const content = `
                 <div class="admin-panel">
-                    <h2>📊 管理员控制台</h2>
-                    <div style="display:flex; gap:10px; margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <h2>📊 管理员控制台</h2>
+                        <button class="btn btn-outline" id="logoutAdmin">退出</button>
+                    </div>
+                    <div style="margin:16px 0; display:flex; gap:10px;">
                         <button class="btn ${currentAdminTab==='rush'?'btn-primary':'btn-outline'}" id="tabRush">抢答题库</button>
                         <button class="btn ${currentAdminTab==='mutual'?'btn-primary':'btn-outline'}" id="tabMutual">互问互答题库</button>
-                        <button class="btn btn-outline" id="tabHistory">问答历史</button>
-                        <button class="btn btn-outline" id="logoutAdmin">退出</button>
+                        <button class="btn ${currentAdminTab==='history'?'btn-primary':'btn-outline'}" id="tabHistory">问答历史</button>
+                        <button class="btn ${currentAdminTab==='scores'?'btn-primary':'btn-outline'}" id="tabScores">分数总览</button>
                     </div>
                     <div id="adminContent"></div>
                 </div>
             `;
-            document.getElementById('app').innerHTML = html;
-
+            document.getElementById('app').innerHTML = content;
             const container = document.getElementById('adminContent');
+
             if (currentAdminTab === 'history') {
                 container.innerHTML = `
                     <h3>问答记录</h3>
@@ -445,10 +342,10 @@
                         <thead><tr><th>时间</th><th>活动</th><th>队伍</th><th>题目</th><th>所选答案</th><th>结果</th><th>分值变动</th></tr></thead>
                         <tbody>${history.map(h => `
                             <tr>
-                                <td>${new Date(h.timestamp).toLocaleTimeString()}</td>
+                                <td>${new Date(h.timestamp).toLocaleString()}</td>
                                 <td>${h.activityType === 'rush' ? '抢答' : '互问互答'}</td>
                                 <td>${h.teamName}</td>
-                                <td style="max-width:200px; overflow:hidden;">${h.question}</td>
+                                <td style="max-width:300px;">${h.question}</td>
                                 <td>${h.selectedAnswer}</td>
                                 <td style="color:${h.isCorrect?'#10b981':'#ef4444'}">${h.isCorrect?'正确':'错误'}</td>
                                 <td>${h.scoreDelta>0?`+${h.scoreDelta}`:h.scoreDelta}</td>
@@ -456,9 +353,18 @@
                         `).join('')}</tbody>
                     </table>
                 `;
-            } else {
+            } else if (currentAdminTab === 'scores') {
                 container.innerHTML = `
-                    <div style="margin-bottom:16px;"><button class="btn btn-primary" id="addBtn">➕ 新增题目</button></div>
+                    <h3>当前队伍分数</h3>
+                    <div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));">
+                        ${gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('')}
+                    </div>
+                `;
+            } else {
+                const qs = currentAdminTab === 'rush' ? rushQs : mutualQs;
+                const qType = currentAdminTab === 'rush' ? 'rush' : 'mutual';
+                container.innerHTML = `
+                    <div style="margin-bottom:16px;"><button class="btn btn-primary" id="addQuestionBtn">➕ 新增题目</button></div>
                     <table class="score-table">
                         <thead><tr><th>题目</th><th>类型</th><th>选项</th><th>答案</th><th>操作</th></tr></thead>
                         <tbody>${qs.map(q => `
@@ -467,46 +373,72 @@
                                 <td>${q.type}</td>
                                 <td>${q.options.join(' | ')}</td>
                                 <td>${q.options[q.answer]}</td>
-                                <td><button class="btn btn-outline btn-sm" data-id="${q.id}" data-edit="1">编辑</button> <button class="btn btn-danger btn-sm" data-id="${q.id}" data-del="1">删除</button></td>
+                                <td><button class="btn btn-outline btn-sm editBtn" data-id="${q.id}">编辑</button> <button class="btn btn-danger btn-sm delBtn" data-id="${q.id}">删除</button></td>
                             </tr>
                         `).join('')}</tbody>
                     </table>
                 `;
-                document.getElementById('addBtn').onclick = () => {
-                    const newQ = { type: '选择题', question: '新问题', options: ['选项A','选项B','选项C','选项D'], answer: 0 };
-                    const endpoint = currentAdminTab === 'rush' ? '/api/rush-questions' : '/api/mutual-questions';
-                    apiPost(endpoint, newQ).then(() => renderAdmin());
-                };
-                document.querySelectorAll('[data-edit]').forEach(btn => {
-                    btn.onclick = () => {
-                        const id = btn.dataset.id;
-                        const q = qs.find(qq => qq.id === id);
-                        if (!q) return;
-                        const newQuestion = prompt('编辑题目文本', q.question);
-                        if (!newQuestion) return;
-                        const newOptions = prompt('选项（用|分隔）', q.options.join('|'));
-                        if (!newOptions) return;
-                        const opts = newOptions.split('|');
-                        const newAnswer = prompt('正确答案索引（0开始）', q.answer);
-                        const updated = { ...q, question: newQuestion, options: opts, answer: parseInt(newAnswer) };
-                        const endpoint = currentAdminTab === 'rush' ? `/api/rush-questions/${id}` : `/api/mutual-questions/${id}`;
-                        apiPut(endpoint, updated).then(() => renderAdmin());
-                    };
+                document.getElementById('addQuestionBtn').onclick = () => showQuestionModal(null, qType);
+                document.querySelectorAll('.editBtn').forEach(btn => btn.onclick = () => {
+                    const id = btn.dataset.id;
+                    const q = qs.find(qq => qq.id === id);
+                    if (q) showQuestionModal(q, qType);
                 });
-                document.querySelectorAll('[data-del]').forEach(btn => {
-                    btn.onclick = () => {
-                        if (!confirm('删除此题？')) return;
-                        const id = btn.dataset.id;
-                        const endpoint = currentAdminTab === 'rush' ? `/api/rush-questions/${id}` : `/api/mutual-questions/${id}`;
-                        apiDelete(endpoint).then(() => renderAdmin());
-                    };
+                document.querySelectorAll('.delBtn').forEach(btn => btn.onclick = () => {
+                    if (!confirm('删除此题？')) return;
+                    const id = btn.dataset.id;
+                    const endpoint = qType === 'rush' ? `/api/rush-questions/${id}` : `/api/mutual-questions/${id}`;
+                    apiDelete(endpoint).then(() => renderAdmin());
                 });
             }
 
             document.getElementById('tabRush').onclick = () => { currentAdminTab = 'rush'; renderAdmin(); };
             document.getElementById('tabMutual').onclick = () => { currentAdminTab = 'mutual'; renderAdmin(); };
             document.getElementById('tabHistory').onclick = () => { currentAdminTab = 'history'; renderAdmin(); };
+            document.getElementById('tabScores').onclick = () => { currentAdminTab = 'scores'; renderAdmin(); };
             document.getElementById('logoutAdmin').onclick = () => { window.location.href = '/'; };
+        }
+
+        function showQuestionModal(existing, qType) {
+            const isEdit = !!existing;
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-card">
+                    <h3>${isEdit ? '编辑题目' : '新增题目'}</h3>
+                    <div><label>题目类型</label><select id="qType"><option value="选择题">选择题</option><option value="判断题">判断题</option></select></div>
+                    <div><label>题目文本</label><input id="qText" value="${existing ? existing.question : ''}" style="width:100%;"></div>
+                    <div><label>选项（用|分隔）</label><input id="qOptions" value="${existing ? existing.options.join('|') : '选项A|选项B|选项C|选项D'}" style="width:100%;"></div>
+                    <div><label>正确答案（0索引）</label><input id="qAnswer" value="${existing ? existing.answer : 0}" style="width:100%;"></div>
+                    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+                        <button class="btn btn-outline" id="cancelBtn">取消</button>
+                        <button class="btn btn-primary" id="saveBtn">保存</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            if (existing) {
+                document.getElementById('qType').value = existing.type;
+            }
+            document.getElementById('cancelBtn').onclick = () => modal.remove();
+            document.getElementById('saveBtn').onclick = async () => {
+                const type = document.getElementById('qType').value;
+                const question = document.getElementById('qText').value.trim();
+                const optionsStr = document.getElementById('qOptions').value.trim();
+                const options = optionsStr.split('|').map(s=>s.trim());
+                const answer = parseInt(document.getElementById('qAnswer').value);
+                if (!question || options.length<2) { alert('请填写完整'); return; }
+                const newQ = { type, question, options, answer };
+                if (isEdit) {
+                    const endpoint = qType === 'rush' ? `/api/rush-questions/${existing.id}` : `/api/mutual-questions/${existing.id}`;
+                    await apiPut(endpoint, newQ);
+                } else {
+                    const endpoint = qType === 'rush' ? '/api/rush-questions' : '/api/mutual-questions';
+                    await apiPost(endpoint, newQ);
+                }
+                modal.remove();
+                renderAdmin();
+            };
         }
 
         function render() {
@@ -520,7 +452,6 @@
         }
 
         connectWebSocket();
-        // 初始仅等待 WebSocket 消息，无额外定时器
     })();
 </script>
 </body>
