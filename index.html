@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>安全知识竞赛 - 稳定版</title>
-    <!-- SheetJS 用于 Excel 导出 -->
+    <title>安全知识竞赛 </title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -122,16 +121,40 @@
     function renderLogin() {
         if(document.getElementById('loginPage')) return;
         document.getElementById('app').innerHTML = `
-            <div class="panel" id="loginPage" style="max-width:400px;margin:10vh auto;">
-                <h1 style="font-size:2rem;text-align:center;">安全知识竞赛</h1>
-                <button class="btn btn-primary" id="hostBtn" style="width:100%;margin:12px 0;">🎤 主持人</button>
-                <button class="btn btn-outline" id="adminBtn" style="width:100%;margin-bottom:12px;">📊 管理员</button>
-                <button class="btn btn-outline" id="playerBtn" style="width:100%;">👥 参赛选手</button>
-                <div id="passwordDiv" class="hidden" style="margin-top:16px;">
-                    <input type="password" id="password" placeholder="请输入密码">
-                    <button class="btn btn-primary" id="submitPwd" style="width:100%;">确认</button>
-                </div>
-            </div>`;
+            <style>
+  .btn-highlight {
+    background-color: #ffc107;
+    color: #000;
+    border-color: #ffc107;
+  }
+</style>
+
+<div class="panel" id="loginPage" style="max-width:400px;margin:10vh auto;">
+  <h1 style="font-size:2rem;text-align:center;margin-bottom:24px;">安全知识组队竞赛</h1>
+  <button class="btn btn-outline" id="hostBtn" style="width:100%;margin-bottom:12px;">🎤 主持人</button>
+  <button class="btn btn-outline" id="adminBtn" style="width:100%;margin-bottom:12px;">📊 管理员</button>
+  <button class="btn btn-outline" id="playerBtn" style="width:100%;">👥 参赛选手</button>
+  <div id="passwordDiv" class="hidden" style="margin-top:16px;">
+    <input type="password" id="password" placeholder="请输入密码">
+    <button class="btn btn-primary" id="submitPwd" style="width:100%;">确认</button>
+  </div>
+</div>
+
+<script>
+  const hostBtn = document.getElementById('hostBtn');
+  const adminBtn = document.getElementById('adminBtn');
+  const playerBtn = document.getElementById('playerBtn');
+  const btns = [hostBtn, adminBtn, playerBtn];
+
+  btns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      // 全部移除高亮
+      btns.forEach(b => b.classList.remove('btn-highlight'));
+      // 当前按钮高亮
+      this.classList.add('btn-highlight');
+    });
+  });
+</script>
         let targetRole = null;
         document.getElementById('hostBtn').onclick = () => { targetRole='host'; document.getElementById('passwordDiv').classList.remove('hidden'); addHighlight(document.getElementById('hostBtn')); };
         document.getElementById('adminBtn').onclick = () => { targetRole='admin'; document.getElementById('passwordDiv').classList.remove('hidden'); addHighlight(document.getElementById('adminBtn')); };
@@ -142,10 +165,33 @@
         };
     }
 
-    // ============ 选手登录与主界面（不变，略）============
-    function renderPlayerLogin() { /* 与之前相同 */ }
-    function updateTeamSelectOptions() { /* 与之前相同 */ }
-    function renderPlayerMain() { /* 与之前相同，需要处理 activityEnded 展示 */ }
+    // ============ 选手登录 ============
+    function renderPlayerLogin() {
+        if(!gameState) return;
+        if(playerLoginRendered) { updateTeamSelectOptions(); return; }
+        document.getElementById('app').innerHTML = `
+            <div class="panel" id="playerLoginPage" style="max-width:400px;margin:10vh auto;">
+                <h2>选手登录</h2>
+                <input id="playerName" placeholder="请输入您的真实姓名">
+                <select id="teamSelect"></select>
+                <button class="btn btn-primary" id="joinBtn" style="width:100%;">进入赛场</button>
+            </div>`;
+        playerLoginRendered = true;
+        updateTeamSelectOptions();
+        document.getElementById('joinBtn').onclick = async () => {
+            const name = document.getElementById('playerName').value.trim();
+            if(!name) return alert('请输入姓名');
+            const teamId = parseInt(document.getElementById('teamSelect').value);
+            await fetch(`/api/team-members/${teamId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
+            currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName: name };
+            renderFullPage(); startLocalTimers();
+        };
+    }
+    function updateTeamSelectOptions() {
+        const sel = document.getElementById('teamSelect');
+        if(!sel||!gameState) return;
+        sel.innerHTML = gameState.players.map(t => `<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('');
+    }
 
     // ============ 主持人界面 ============
     function renderHost() {
@@ -156,7 +202,7 @@
             bannerHtml = `<div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div>`;
         } else {
             if(gameState.lastBuzzWinner?.timestamp+4000 > Date.now())
-                bannerHtml += `<div class="result-banner buzz">🏆 ${gameState.lastBuzzWinner.teamName} 抢答成功</div>`;
+                bannerHtml += `<div class="result-banner buzz">🏆 ${gameState.lastBuzzWinner.teamName}（${gameState.lastBuzzWinner.playerName||'?'}）抢答成功</div>`;
             if(gameState.lastAnswerResult?.timestamp+4000 > Date.now()) {
                 const cls = gameState.lastAnswerResult.isCorrect?'correct':'wrong';
                 bannerHtml += `<div class="result-banner ${cls}">${gameState.lastAnswerResult.message}</div>`;
@@ -165,7 +211,6 @@
         let content = `<div class="panel">
             <div class="flex-row" style="justify-content:space-between;"><h2>🎙️ 主持人控制台</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
             <div class="flex-row" style="margin:16px 0;">
-                <!-- 互问互答在左，抢答在右 -->
                 <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">互问互答</button>
                 <button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">抢答活动</button>
             </div>
@@ -192,7 +237,7 @@
                 const drawTeam = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
                 const answerTeam = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
                 content += `<div class="question-area">
-                    <div class="phase-tip">🎲 ${drawTeam?.name} 抽题 → 🎯 ${answerTeam?.name} 答题</div>
+                    <div class="phase-tip" style="font-size:1.3rem;">🎲 抽题队伍：${drawTeam?.name} &nbsp; 🎯 答题队伍：${answerTeam?.name}</div>
                     ${mutual.roundActive?`<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div><div id="mutualTimer" class="timer"></div>`:'<div>等待抽题...</div>'}
                     <button class="btn btn-primary" id="drawBtn" ${(mutual.roundActive||mutual.phaseEnded)?'disabled':''}>📖 抽取题目</button></div>`;
             }
@@ -216,7 +261,7 @@
         document.getElementById('logoutBtn').onclick = () => { window.location.href='/'; };
     }
 
-    // 选手主界面也要处理 activityEnded
+    // ============ 选手主界面 ============
     function renderPlayerMain() {
         const player = gameState.players.find(p=>p.id===currentPlayer.id);
         if(!player) return;
@@ -224,11 +269,50 @@
             document.getElementById('app').innerHTML = `<div class="panel"><div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div></div>`;
             return;
         }
-        // 其余代码不变（略）
+        const act = gameState.currentActivity, rush = gameState.rush, mutual = gameState.mutual;
+        let canBuzz=false, canAnswer=false, showBuzz=(act==='rush');
+        let qHtml='<div>等待主持人开始...</div>', optHtml='', timerHtml='', special='';
+        if(act==='rush') {
+            if(rush.currentQuestion && rush.roundState!=='IDLE') {
+                qHtml = `<div class="q-text">${rush.currentQuestion.question}</div>`;
+                optHtml = `<div class="options" id="opts">${rush.currentQuestion.options.map((o,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`;
+                canBuzz = (rush.roundState==='RUSHING' && rush.buzzerPlayerId===null);
+                if(rush.roundState==='RUSHING') timerHtml='<div id="rushTimer" class="timer"></div>';
+                if(rush.roundState==='ANSWERING' && rush.buzzerPlayerId===player.id) { timerHtml='<div id="rushTimer" class="timer"></div>'; canAnswer=true; }
+                if(rush.buzzerPlayerId && rush.buzzerPlayerId!==player.id) special=`<div>⚠️ ${gameState.players.find(p=>p.id===rush.buzzerPlayerId)?.name} 已抢答</div>`;
+            }
+        } else {
+            if(mutual.roundActive) {
+                const isAnswer = (mutual.answeringPlayerId===player.id);
+                qHtml = `<div class="q-text">${mutual.currentQuestion?.question}</div>`;
+                optHtml = `<div class="options" id="opts">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`;
+                if(isAnswer) { timerHtml='<div id="mutualTimer" class="timer"></div>'; canAnswer=true; special='<div style="color:#10b981;">🎤 轮到你们队回答！</div>'; }
+                else special=`<div>⏳ ${gameState.players.find(p=>p.id===mutual.answeringPlayerId)?.name} 正在回答</div>`;
+            } else if(mutual.phaseEnded) special='<div>🎉 互问互答环节已结束！</div>';
+            else {
+                special = `<div>抽题: ${gameState.players.find(p=>p.id===mutual.currentDrawTeamId)?.name} | 答题: ${gameState.players.find(p=>p.id===mutual.currentAnswerTeamId)?.name}</div>`;
+                if(mutual.currentDrawTeamId===player.id) special += `<button class="btn btn-primary" id="drawBtn">📖 抽题</button>`;
+            }
+        }
+        const html = `<div class="panel">
+            <div class="flex-row" style="justify-content:space-between;"><h2>${player.emoji} ${player.name} (${currentPlayer.playerName})</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
+            <div class="phase-tip">${act==='rush'?'⚡抢答活动⚡':'🤝互问互答🤝'}</div>
+            <div class="question-area">${qHtml}${optHtml}${timerHtml}${special}</div>
+            ${showBuzz?`<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>`:''}
+            <div class="team-grid">${gameState.players.map(renderTeamCard).join('')}</div>
+        </div>`;
+        document.getElementById('app').innerHTML = html;
+        if(showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({type:'PLAYER_RUSH',playerId:player.id,playerName:currentPlayer.playerName});
+        if(document.getElementById('opts') && canAnswer) {
+            document.querySelectorAll('.option').forEach(o => o.onclick = () => sendMessage({type:'PLAYER_ANSWER',playerId:player.id,playerName:currentPlayer.playerName,answerIndex:parseInt(o.dataset.opt)}));
+        }
+        const drawBtn = document.getElementById('drawBtn');
+        if(drawBtn) drawBtn.onclick = () => { drawBtn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}}); setTimeout(()=>drawBtn.classList.remove('draw-anim'),600); };
+        document.getElementById('logoutBtn').onclick = () => { currentPlayer=null; playerLoginRendered=false; window.location.href='?role=player'; };
     }
 
     // ============ 管理员界面 ============
-    let adminTab = 'rushQuestions';
+    let adminTab = 'scores';
     async function renderAdmin() {
         const container = document.getElementById('app');
         container.innerHTML = `<div class="panel"><h2>📊 管理员后台</h2>
@@ -271,12 +355,144 @@
                 XLSX.writeFile(wb, "知识竞赛分数总览.xlsx");
             };
         } else if (adminTab === 'rushQuestions' || adminTab === 'mutualQuestions') {
-            // 题库管理代码不变（略）
+            const type = adminTab === 'rushQuestions' ? 'rush' : 'mutual';
+            const questions = await fetch(`/api/${type}-questions`).then(r=>r.json());
+            contentDiv.innerHTML = `
+                <div class="flex-row" style="justify-content:space-between;">
+                    <h3>${type==='rush'?'抢答':'互问'}题库 (${questions.length}题)</h3>
+                    <div>
+                        <button class="btn btn-sm btn-primary" id="addQuestionBtn">+ 新增</button>
+                        <button class="btn btn-sm btn-outline" id="importBtn">📥 导入JSON</button>
+                        <button class="btn btn-sm btn-outline" id="exportBtn">📤 导出JSON</button>
+                    </div>
+                </div>
+                <table>${questions.length===0?'<tr><td colspan="5">暂无题目</td></tr>':
+                `<tr><th>题目</th><th>类型</th><th>选项</th><th>答案</th><th>操作</th></tr>
+                ${questions.map(q=>`<tr>
+                    <td>${q.question}</td><td>${q.type}</td>
+                    <td>${q.options.join(' | ')}</td>
+                    <td>${q.type==='判断题'? (q.answer===0?'正确':'错误') : q.options[q.answer]}</td>
+                    <td><button class="btn btn-sm btn-outline editQ" data-id="${q.id}">✏️</button> <button class="btn btn-sm btn-danger delQ" data-id="${q.id}">🗑</button></td>
+                </tr>`).join('')}`}</table>`;
+            document.getElementById('addQuestionBtn').onclick = () => showQuestionModal(type);
+            document.getElementById('importBtn').onclick = () => {
+                const input = document.createElement('input'); input.type='file'; input.accept='.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0]; if(!file) return;
+                    const text = await file.text();
+                    const arr = JSON.parse(text);
+                    for(const q of arr) await fetch(`/api/${type}-questions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q)});
+                    renderAdminContent();
+                };
+                input.click();
+            };
+            document.getElementById('exportBtn').onclick = async () => {
+                const data = await fetch(`/api/${type}-questions`).then(r=>r.json());
+                const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+                const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${type}_questions.json`; a.click();
+            };
+            document.querySelectorAll('.editQ').forEach(btn => btn.onclick = async () => {
+                const id = btn.dataset.id;
+                const q = await fetch(`/api/${type}-questions`).then(r=>r.json()).then(list=>list.find(q=>q.id===id));
+                showQuestionModal(type, q);
+            });
+            document.querySelectorAll('.delQ').forEach(btn => btn.onclick = async () => {
+                if(!confirm('确定删除此题？')) return;
+                await fetch(`/api/${type}-questions/${btn.dataset.id}`,{method:'DELETE'});
+                renderAdminContent();
+            });
         } else if (adminTab === 'history') {
-            // 历史记录代码不变（略）
+            const history = await fetch('/api/history').then(r=>r.json());
+            contentDiv.innerHTML = `<h3>答题记录 (${history.length}条)</h3>
+            <table>${history.length===0?'<tr><td>暂无记录</td></tr>':
+            `<tr><th>时间</th><th>活动</th><th>队伍</th><th>选手</th><th>题目</th><th>答案</th><th>结果</th><th>分数</th></tr>
+            ${history.map(h=>`<tr>
+                <td>${new Date(h.timestamp).toLocaleTimeString()}</td>
+                <td>${h.activityType==='rush'?'抢答':'互问'}</td>
+                <td>${h.teamName}</td><td>${h.playerName}</td>
+                <td>${h.question}</td><td>${h.selectedAnswer}</td>
+                <td style="color:${h.isCorrect?'#10b981':'#ef4444'}">${h.isCorrect?'✅正确':'❌错误'}</td>
+                <td>${h.scoreDelta>0?'+'+h.scoreDelta:h.scoreDelta}</td>
+            </tr>`).join('')}`}</table>`;
         } else if (adminTab === 'members') {
-            // 成员管理代码不变（略）
+            const members = await fetch('/api/team-members').then(r=>r.json());
+            contentDiv.innerHTML = `<h3>队伍成员</h3>
+            ${gameState.players.map(p => {
+                const list = members[p.id] || [];
+                return `<div style="margin:8px 0;"><b>${p.emoji} ${p.name} (${list.length}人)</b>
+                    <div class="flex-row">
+                        <input placeholder="添加成员" id="addMember${p.id}" style="width:150px;">
+                        <button class="btn btn-sm btn-primary addMemBtn" data-team="${p.id}">添加</button>
+                    </div>
+                    <div>${list.length===0?'暂无成员':list.map(m=>`<span style="display:inline-block;background:#1e293b;border-radius:20px;padding:4px 12px;margin:4px;cursor:pointer" class="delMem" data-team="${p.id}" data-name="${m}">${m} ❌</span>`).join('')}</div>
+                </div>`;
+            }).join('')}`;
+            document.querySelectorAll('.addMemBtn').forEach(b => b.onclick = async () => {
+                const teamId = parseInt(b.dataset.team);
+                const name = document.getElementById(`addMember${teamId}`).value.trim();
+                if(!name) return;
+                await fetch(`/api/team-members/${teamId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
+                renderAdminContent();
+            });
+            document.querySelectorAll('.delMem').forEach(el => el.onclick = async () => {
+                const teamId = parseInt(el.dataset.team);
+                const name = el.dataset.name;
+                await fetch(`/api/team-members/${teamId}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
+                renderAdminContent();
+            });
         }
+    }
+
+    function showQuestionModal(type, q = null) {
+        const isEdit = !!q;
+        const modal = document.createElement('div'); modal.className='modal';
+        modal.innerHTML = `<div class="modal-card">
+            <h3>${isEdit?'编辑':'新增'}${type==='rush'?'抢答':'互问'}题目</h3>
+            <select id="qType"><option value="选择题" ${q?.type==='选择题'?'selected':''}>选择题</option><option value="判断题" ${q?.type==='判断题'?'selected':''}>判断题</option></select>
+            <textarea id="qQuestion" placeholder="题目内容">${q?.question||''}</textarea>
+            <div id="optionsDiv">${(q?.type==='判断题')? '' : (q?.options||['','','','']).map((o,i)=>`<input placeholder="选项${i+1}" value="${o}" class="qOpt">`).join('')}</div>
+            <select id="qAnswer">${q?.options?.map((o,i)=>`<option value="${i}" ${i===q?.answer?'selected':''}>${o}</option>`).join('')||'<option>请先填写选项</option>'}</select>
+            <div class="flex-row" style="margin-top:16px;">
+                <button class="btn btn-primary" id="saveQ">保存</button>
+                <button class="btn btn-outline" id="cancelQ">取消</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+        document.getElementById('qType').onchange = function() {
+            const isJudge = this.value==='判断题';
+            document.getElementById('optionsDiv').innerHTML = isJudge ? '' : ['A','B','C','D'].map((l,i)=>`<input placeholder="选项${l}" class="qOpt" value="">`).join('');
+            updateAnswerSelect();
+        };
+        document.getElementById('qQuestion').addEventListener('input', updateAnswerSelect);
+        document.getElementById('optionsDiv').addEventListener('input', updateAnswerSelect);
+        function updateAnswerSelect() {
+            const type = document.getElementById('qType').value;
+            const sel = document.getElementById('qAnswer');
+            if(type==='判断题') sel.innerHTML = `<option value="0">正确</option><option value="1">错误</option>`;
+            else {
+                const opts = Array.from(document.querySelectorAll('.qOpt')).map(o=>o.value).filter(v=>v);
+                sel.innerHTML = opts.map((o,i)=>`<option value="${i}">${o}</option>`).join('') || '<option>请填写选项</option>';
+            }
+        }
+        if(isEdit && q.type==='判断题') document.getElementById('qAnswer').innerHTML = `<option value="0" ${q.answer===0?'selected':''}>正确</option><option value="1" ${q.answer===1?'selected':''}>错误</option>`;
+        document.getElementById('saveQ').onclick = async () => {
+            const type = document.getElementById('qType').value;
+            const question = document.getElementById('qQuestion').value.trim();
+            let options, answer;
+            if(type==='判断题') { options = ['正确','错误']; answer = parseInt(document.getElementById('qAnswer').value); }
+            else {
+                options = Array.from(document.querySelectorAll('.qOpt')).map(o=>o.value.trim()).filter(v=>v);
+                if(options.length<2) return alert('至少需要两个选项');
+                answer = parseInt(document.getElementById('qAnswer').value);
+            }
+            const payload = { type, question, options, answer };
+            if(isEdit) await fetch(`/api/${type}-questions/${q.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            else await fetch(`/api/${type}-questions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            document.body.removeChild(modal);
+            renderAdminContent();
+        };
+        document.getElementById('cancelQ').onclick = () => document.body.removeChild(modal);
+        modal.onclick = (e) => { if(e.target===modal) document.body.removeChild(modal); };
     }
 
     function renderFullPage() {
