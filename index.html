@@ -65,12 +65,17 @@
     let currentPlayer = null;
     let playerLoginRendered = false;
 
-    // 倒计时显示变量
     let rushCountdown = 0;
     let mutualCountdown = 0;
     let countdownInterval = null;
 
     const wsUrl = `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
+
+    function formatTime(sec) {
+        const mins = Math.floor(sec / 60);
+        const secs = sec % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 
     function showToast(msg) {
         const t = document.createElement('div'); t.className='toast'; t.innerText=msg;
@@ -85,13 +90,13 @@
             const mutualEl = document.getElementById('mutualTimer');
             if (rushEl && gameState.currentActivity === 'rush') {
                 if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
-                    rushEl.textContent = `⏰ 抢答倒计时: ${rushCountdown} 秒`;
+                    rushEl.textContent = `⏰ 倒计时: ${formatTime(rushCountdown)}`;
                 } else {
                     rushEl.textContent = '';
                 }
             }
             if (mutualEl && gameState.currentActivity === 'mutual' && gameState.mutual.roundActive) {
-                mutualEl.textContent = `⌛ 答题倒计时: ${mutualCountdown} 秒`;
+                mutualEl.textContent = `⌛ 倒计时: ${formatTime(mutualCountdown)}`;
             } else if (mutualEl) {
                 mutualEl.textContent = '';
             }
@@ -225,7 +230,7 @@
             if(gameState.lastBuzzWinner?.timestamp+4000 > Date.now())
                 bannerHtml += `<div class="result-banner buzz">🏆 ${gameState.lastBuzzWinner.teamName} 抢答成功</div>`;
             if(gameState.lastAnswerResult?.timestamp+4000 > Date.now()) {
-                const cls = gameState.lastAnswerResult.isCorrect?'correct':'wrong';
+                const cls = gameState.lastAnswerResult.isCorrect ? 'correct' : 'wrong';
                 bannerHtml += `<div class="result-banner ${cls}">${gameState.lastAnswerResult.message}</div>`;
             }
         }
@@ -245,7 +250,7 @@
                     content += `<div class="question-area">
                         <div>状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
                         ${rush.currentQuestion?`<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`:'<div>暂无题目</div>'}
-                        <div id="rushTimer" class="timer">⏰ 抢答倒计时: ${rushCountdown} 秒</div>
+                        <div id="rushTimer" class="timer">⏰ 倒计时: ${formatTime(rushCountdown)}</div>
                         <div class="flex-row" style="margin-top:12px;">
                             <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button>
                             <button class="btn btn-outline" id="skipRushBtn" ${(rush.roundState!=='RUSHING'&&rush.roundState!=='ANSWERING')?'disabled':''}>跳过本题</button>
@@ -256,7 +261,7 @@
                 const answerTeam = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
                 content += `<div class="question-area">
                     <div class="phase-tip">🎲 ${drawTeam?.name} → 🎯 ${answerTeam?.name}</div>
-                    ${mutual.roundActive?`<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div><div id="mutualTimer" class="timer">⌛ 答题倒计时: ${mutualCountdown} 秒</div>`:'<div>等待抽题...</div>'}
+                    ${mutual.roundActive?`<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div><div id="mutualTimer" class="timer">⌛ 倒计时: ${formatTime(mutualCountdown)}</div>`:'<div>等待抽题...</div>'}
                     <button class="btn btn-primary" id="drawBtn" ${(mutual.roundActive||mutual.phaseEnded)?'disabled':''}>📖 抽取题目</button></div>`;
             }
         }
@@ -273,7 +278,7 @@
                     document.getElementById('skipRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'skipRush'});
                 }
             } else {
-                document.getElementById('drawBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:mutual.currentDrawTeamId}});
+                document.getElementById('drawBtn').onclick = () => { const btn=document.getElementById('drawBtn'); btn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:mutual.currentDrawTeamId}}); setTimeout(()=>btn.classList.remove('draw-anim'),600); };
             }
         }
         document.getElementById('logoutBtn').onclick = () => { window.location.href='/'; };
@@ -295,8 +300,8 @@
                 qHtml = `<div class="q-text">${rush.currentQuestion.question}</div>`;
                 optHtml = `<div class="options" id="opts">${rush.currentQuestion.options.map((o,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`;
                 canBuzz = (rush.roundState==='RUSHING' && rush.buzzerPlayerId===null);
-                if(rush.roundState==='RUSHING') timerHtml=`<div id="rushTimer" class="timer">⏰ 抢答倒计时: ${rushCountdown} 秒</div>`;
-                if(rush.roundState==='ANSWERING' && rush.buzzerPlayerId===player.id) { timerHtml=`<div id="rushTimer" class="timer">✏️ 答题倒计时: ${rushCountdown} 秒</div>`; canAnswer=true; }
+                if(rush.roundState==='RUSHING') timerHtml=`<div id="rushTimer" class="timer">⏰ 倒计时: ${formatTime(rushCountdown)}</div>`;
+                if(rush.roundState==='ANSWERING' && rush.buzzerPlayerId===player.id) { timerHtml=`<div id="rushTimer" class="timer">✏️ 倒计时: ${formatTime(rushCountdown)}</div>`; canAnswer=true; }
                 if(rush.buzzerPlayerId && rush.buzzerPlayerId!==player.id) special=`<div>⚠️ ${gameState.players.find(p=>p.id===rush.buzzerPlayerId)?.name} 已抢答</div>`;
             }
         } else {
@@ -304,7 +309,7 @@
                 const isAnswer = (mutual.answeringPlayerId===player.id);
                 qHtml = `<div class="q-text">${mutual.currentQuestion?.question}</div>`;
                 optHtml = `<div class="options" id="opts">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`;
-                if(isAnswer) { timerHtml=`<div id="mutualTimer" class="timer">⌛ 答题倒计时: ${mutualCountdown} 秒</div>`; canAnswer=true; special='<div style="color:#10b981;">🎤 轮到你们队！</div>'; }
+                if(isAnswer) { timerHtml=`<div id="mutualTimer" class="timer">⌛ 倒计时: ${formatTime(mutualCountdown)}</div>`; canAnswer=true; special='<div style="color:#10b981;">🎤 轮到你们队！</div>'; }
                 else special=`<div>⏳ ${gameState.players.find(p=>p.id===mutual.answeringPlayerId)?.name} 正在答题</div>`;
             } else if(mutual.phaseEnded) special='<div>🎉 互问互答环节已结束！</div>';
             else {
@@ -322,7 +327,7 @@
         if(showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({type:'PLAYER_RUSH',playerId:player.id,playerName:currentPlayer.playerName});
         if(document.getElementById('opts') && canAnswer) document.querySelectorAll('.option').forEach(o => o.onclick = () => sendMessage({type:'PLAYER_ANSWER',playerId:player.id,playerName:currentPlayer.playerName,answerIndex:parseInt(o.dataset.opt)}));
         const drawBtn = document.getElementById('drawBtn');
-        if(drawBtn) drawBtn.onclick = () => sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}});
+        if(drawBtn) drawBtn.onclick = () => { drawBtn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}}); setTimeout(()=>drawBtn.classList.remove('draw-anim'),600); };
         document.getElementById('logoutBtn').onclick = () => { currentPlayer=null; playerLoginRendered=false; window.location.href='?role=player'; };
     }
 
