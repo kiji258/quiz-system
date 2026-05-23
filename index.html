@@ -22,9 +22,9 @@
         .question-area{background:#0f172a;border-radius:28px;padding:24px;margin:16px 0;}
         .q-text{font-size:2.8rem;font-weight:700;margin:12px 0;word-break:break-word;line-height:1.3;}
         .options{display:flex;flex-direction:column;gap:12px;margin-top:16px;}
-        .option{background:#1e293b;border-radius:60px;padding:14px 24px;font-size:1.5rem;cursor:pointer;border:2px solid transparent;text-align:left;transition:0.1s;}
+        .option{background:#1e293b;border-radius:60px;padding:14px 24px;font-size:1.5rem;cursor:pointer;border:2px solid transparent;text-align:left;}
         .option:active{transform:scale(0.98);background:#334155;}
-        .option.disabled{opacity:0.5;pointer-events:none;cursor:not-allowed;}
+        .option.disabled{opacity:0.5;pointer-events:none;}
         .buzz-btn{background:radial-gradient(circle at 30% 20%, #fbbf24, #d97706);border:none;border-radius:120px;padding:24px;font-size:2.2rem;font-weight:900;width:100%;margin:20px 0;cursor:pointer;color:#1e1a0a;box-shadow:0 8px 24px rgba(251,191,36,0.4);}
         .buzz-btn:active{transform:scale(0.97);}
         .buzz-btn:disabled{opacity:0.5;pointer-events:none;}
@@ -35,7 +35,7 @@
         .result-banner.correct{background:#10b981;color:white;border:4px solid #fbbf24;}
         .result-banner.wrong{background:#ef4444;color:white;border:4px solid #fbbf24;}
         .result-banner.buzz{background:#fbbf24;color:#1e1a0a;font-size:2.8rem;}
-        .result-banner.end{background:#8b5cf6;color:white;font-size:3rem;border:4px solid #a78bfa;}
+        .result-banner.end{background:#8b5cf6;color:white;font-size:3rem;}
         @keyframes fadeOutResult{0%{opacity:1;}80%{opacity:1;}100%{opacity:0;visibility:hidden;}}
         .phase-tip{font-size:1.6rem;font-weight:bold;text-align:center;margin:8px 0;color:#f0c040;}
         input,select,textarea{background:#1e293b;border:2px solid #475569;color:white;padding:10px 16px;border-radius:30px;width:100%;font-size:1rem;margin-bottom:10px;outline:none;}
@@ -65,58 +65,25 @@
     let gameState = null;
     let currentPlayer = null;
     let playerLoginRendered = false;
-
-    let rushCountdown = 0;
-    let mutualCountdown = 0;
-    let countdownInterval = null;
-    let answerLocked = false;
-    let activeBanner = null; // { message, type, timeoutId }
-
+    let rushCountdown = 0, mutualCountdown = 0, countdownInterval = null, answerLocked = false;
     const wsUrl = `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
 
-    function formatTime(sec) {
-        const mins = Math.floor(sec / 60);
-        const secs = sec % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
-
-    function showToast(msg) {
-        const t = document.createElement('div'); t.className='toast'; t.innerText=msg;
-        document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
-    }
+    function formatTime(sec) { const m = Math.floor(sec/60); const s = sec%60; return `${m}:${s.toString().padStart(2,'0')}`; }
+    function showToast(msg) { const t = document.createElement('div'); t.className='toast'; t.innerText=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500); }
     function sendMessage(msg) { if(ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 
-    function setBanner(message, type) {
-        if (activeBanner?.timeoutId) clearTimeout(activeBanner.timeoutId);
-        activeBanner = { message, type, timeoutId: setTimeout(() => {
-            activeBanner = null;
-            renderFullPage();
-        }, 4000) };
-    }
-
     function startCountdownDisplay() {
-        if (countdownInterval) clearInterval(countdownInterval);
+        if(countdownInterval) clearInterval(countdownInterval);
         countdownInterval = setInterval(() => {
-            const rushEl = document.getElementById('rushTimer');
-            const mutualEl = document.getElementById('mutualTimer');
-            if (rushEl && gameState.currentActivity === 'rush') {
-                if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
-                    rushEl.textContent = `⏰ 倒计时: ${formatTime(rushCountdown)}`;
-                } else {
-                    rushEl.textContent = '';
-                }
+            const rushEl = document.getElementById('rushTimer'), mutualEl = document.getElementById('mutualTimer');
+            if(rushEl && gameState.currentActivity==='rush') {
+                if(gameState.rush.roundState==='RUSHING'||gameState.rush.roundState==='ANSWERING') rushEl.textContent = `⏰ 倒计时: ${formatTime(rushCountdown)}`;
+                else rushEl.textContent = '';
             }
-            if (mutualEl && gameState.currentActivity === 'mutual' && gameState.mutual.roundActive) {
-                mutualEl.textContent = `⌛ 倒计时: ${formatTime(mutualCountdown)}`;
-            } else if (mutualEl) {
-                mutualEl.textContent = '';
-            }
-            if (gameState.currentActivity === 'rush' && (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING')) {
-                rushCountdown = Math.max(0, rushCountdown - 1);
-            }
-            if (gameState.currentActivity === 'mutual' && gameState.mutual.roundActive) {
-                mutualCountdown = Math.max(0, mutualCountdown - 1);
-            }
+            if(mutualEl && gameState.currentActivity==='mutual' && gameState.mutual.roundActive) mutualEl.textContent = `⌛ 倒计时: ${formatTime(mutualCountdown)}`;
+            else if(mutualEl) mutualEl.textContent = '';
+            if(gameState.currentActivity==='rush' && (gameState.rush.roundState==='RUSHING'||gameState.rush.roundState==='ANSWERING')) rushCountdown = Math.max(0, rushCountdown-1);
+            if(gameState.currentActivity==='mutual' && gameState.mutual.roundActive) mutualCountdown = Math.max(0, mutualCountdown-1);
         }, 1000);
     }
 
@@ -125,41 +92,25 @@
         ws.onopen = () => console.log('WS connected');
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            if (data.type === 'STATE') {
+            if(data.type==='STATE') {
                 gameState = data.state;
                 answerLocked = false;
-                if (data.state.rushRemainingSec !== undefined) {
-                    rushCountdown = data.state.rushRemainingSec;
-                    mutualCountdown = data.state.mutualRemainingSec || 0;
-                }
-                // 检测答题结果或抢答成功，设置横幅
-                if (data.state.lastAnswerResult && data.state.lastAnswerResult.timestamp + 4000 > Date.now()) {
-                    const res = data.state.lastAnswerResult;
-                    const type = res.isCorrect ? 'correct' : 'wrong';
-                    setBanner(res.message, type);
-                } else if (data.state.lastBuzzWinner && data.state.lastBuzzWinner.timestamp + 4000 > Date.now()) {
-                    setBanner(`🏆 ${data.state.lastBuzzWinner.teamName} 抢答成功`, 'buzz');
-                }
-                renderFullPage();
-                startCountdownDisplay();
-            } else if (data.type === 'ANSWER_RESULT') {
-                showToast(data.result.msg);
-            }
+                if(data.state.rushRemainingSec !== undefined) { rushCountdown = data.state.rushRemainingSec; mutualCountdown = data.state.mutualRemainingSec||0; }
+                renderFullPage(); startCountdownDisplay();
+            } else if(data.type==='ANSWER_RESULT') { showToast(data.result.msg); answerLocked = false; }
         };
-        ws.onclose = () => setTimeout(connectWebSocket, 3000);
+        ws.onclose = () => setTimeout(connectWebSocket,3000);
         ws.onerror = (err) => console.error(err);
     }
 
-    function getMemberCount(teamId) { return (gameState?.teamMembers?.[teamId] || []).length; }
+    function getMemberCount(teamId) { return (gameState?.teamMembers?.[teamId]||[]).length; }
     function isTeamActive(teamId) { return gameState?.activeTeams?.includes(teamId); }
-
     function renderTeamCard(p) {
-        if (!isTeamActive(p.id)) return '';
-        const cnt = getMemberCount(p.id);
-        return `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name} <span class="member-count">${cnt}</span></div><div class="score-big">${p.score}</div></div>`;
+        if(!isTeamActive(p.id)) return '';
+        return `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name} <span class="member-count">${getMemberCount(p.id)}</span></div><div class="score-big">${p.score}</div></div>`;
     }
 
-    // ============ 登录界面 ============
+    // 登录界面
     function renderLogin() {
         if(document.getElementById('loginPage')) return;
         document.getElementById('app').innerHTML = `
@@ -174,42 +125,21 @@
                 </div>
             </div>`;
         let targetRole = null;
-        const clearHighlights = () => {
-            document.querySelectorAll('#hostBtn, #adminBtn, #playerBtn').forEach(b => {
-                b.classList.remove('btn-highlight');
-                b.classList.add('btn-outline');
-                b.classList.remove('btn-primary');
-            });
-        };
-        document.getElementById('hostBtn').onclick = () => {
-            clearHighlights(); targetRole='host';
-            document.getElementById('passwordDiv').classList.remove('hidden');
-            document.getElementById('hostBtn').classList.add('btn-highlight','btn-primary'); document.getElementById('hostBtn').classList.remove('btn-outline');
-        };
-        document.getElementById('adminBtn').onclick = () => {
-            clearHighlights(); targetRole='admin';
-            document.getElementById('passwordDiv').classList.remove('hidden');
-            document.getElementById('adminBtn').classList.add('btn-highlight','btn-primary'); document.getElementById('adminBtn').classList.remove('btn-outline');
-        };
-        document.getElementById('playerBtn').onclick = () => {
-            clearHighlights();
-            document.getElementById('playerBtn').classList.add('btn-highlight','btn-primary'); document.getElementById('playerBtn').classList.remove('btn-outline');
-            setTimeout(() => window.location.href='?role=player',200);
-        };
+        const clearHighlights = () => document.querySelectorAll('#hostBtn,#adminBtn,#playerBtn').forEach(b => { b.classList.remove('btn-highlight','btn-primary'); b.classList.add('btn-outline'); });
+        document.getElementById('hostBtn').onclick = () => { clearHighlights(); targetRole='host'; document.getElementById('passwordDiv').classList.remove('hidden'); document.getElementById('hostBtn').classList.add('btn-highlight','btn-primary'); document.getElementById('hostBtn').classList.remove('btn-outline'); };
+        document.getElementById('adminBtn').onclick = () => { clearHighlights(); targetRole='admin'; document.getElementById('passwordDiv').classList.remove('hidden'); document.getElementById('adminBtn').classList.add('btn-highlight','btn-primary'); document.getElementById('adminBtn').classList.remove('btn-outline'); };
+        document.getElementById('playerBtn').onclick = () => { clearHighlights(); document.getElementById('playerBtn').classList.add('btn-highlight','btn-primary'); setTimeout(()=>window.location.href='?role=player',200); };
         document.getElementById('submitPwd').onclick = () => {
             const pwd = document.getElementById('password').value;
-            if (targetRole === 'host' && pwd === '123') window.location.href = '?role=host';
-            else if (targetRole === 'admin' && pwd === '456') window.location.href = '?role=admin';
+            if(targetRole==='host' && pwd==='123') window.location.href='?role=host';
+            else if(targetRole==='admin' && pwd==='456') window.location.href='?role=admin';
             else alert('密码错误');
         };
     }
 
-    // ============ 选手登录 ============
+    // 选手登录
     function renderPlayerLogin() {
-        if(!gameState) {
-            document.getElementById('app').innerHTML = `<div class="panel" style="max-width:400px;margin:10vh auto;text-align:center;"><p>⏳ 正在连接服务器...</p></div>`;
-            return;
-        }
+        if(!gameState) { document.getElementById('app').innerHTML = '<div class="panel" style="max-width:400px;margin:10vh auto;"><p>⏳ 连接服务器中...</p></div>'; return; }
         if(playerLoginRendered) { updateTeamSelectOptions(); return; }
         document.getElementById('app').innerHTML = `
             <div class="panel" id="playerLoginPage" style="max-width:400px;margin:10vh auto;">
@@ -219,94 +149,72 @@
                 <button class="btn btn-primary" id="joinBtn" style="width:100%;">进入赛场</button>
                 <p id="loginError" style="color:red;margin-top:8px;display:none;"></p>
             </div>`;
-        playerLoginRendered = true;
-        updateTeamSelectOptions();
+        playerLoginRendered = true; updateTeamSelectOptions();
         document.getElementById('joinBtn').onclick = async () => {
             const name = document.getElementById('playerName').value.trim();
             if(!name) return alert('请输入姓名');
             const teamId = parseInt(document.getElementById('teamSelect').value);
             try {
-                const res = await fetch(`/api/team-members/${teamId}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({playerName:name}) });
-                if (!res.ok) throw new Error('网络错误');
-                currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName: name };
+                const res = await fetch(`/api/team-members/${teamId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
+                if(!res.ok) throw new Error('网络错误');
+                currentPlayer = { id:teamId, name:gameState.players.find(p=>p.id===teamId).name, playerName:name };
                 renderFullPage(); startCountdownDisplay();
-            } catch(e) { console.error(e); showToast('连接失败，请检查服务器'); }
+            } catch(e) { showToast('连接失败'); }
         };
     }
-    function updateTeamSelectOptions() {
-        const sel = document.getElementById('teamSelect');
-        if(!sel||!gameState) return;
-        sel.innerHTML = gameState.players.map(t => `<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('');
-    }
+    function updateTeamSelectOptions() { const sel = document.getElementById('teamSelect'); if(sel) sel.innerHTML = gameState.players.map(t => `<option value="${t.id}">${t.emoji} ${t.name}</option>`).join(''); }
 
-    // ============ 主持人界面 ============
+    // 主持人界面
     function renderHost() {
-        const act = gameState.currentActivity;
-        const rush = gameState.rush, mutual = gameState.mutual;
+        const act = gameState.currentActivity, rush = gameState.rush, mutual = gameState.mutual;
         let bannerHtml = '';
-        if (gameState.activityEnded) {
-            bannerHtml = `<div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div>`;
-        } else if (activeBanner) {
-            const cls = activeBanner.type === 'correct' ? 'correct' : (activeBanner.type === 'wrong' ? 'wrong' : 'buzz');
-            bannerHtml = `<div class="result-banner ${cls}">${activeBanner.message}</div>`;
+        if(gameState.activityEnded) bannerHtml = `<div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div>`;
+        else {
+            if(gameState.lastBuzzWinner?.timestamp+4000 > Date.now()) bannerHtml += `<div class="result-banner buzz">🏆 ${gameState.lastBuzzWinner.teamName} 抢答成功</div>`;
+            if(gameState.lastAnswerResult?.timestamp && gameState.lastAnswerResult.timestamp+4000 > Date.now()) {
+                const cls = gameState.lastAnswerResult.isCorrect ? 'correct' : 'wrong';
+                bannerHtml += `<div class="result-banner ${cls}">${gameState.lastAnswerResult.message}</div>`;
+            }
         }
-        let content = `<div class="panel">
-            <div class="flex-row" style="justify-content:space-between;"><h2>🎙️ 主持人控制台</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
+        let content = `<div class="panel"><div class="flex-row" style="justify-content:space-between;"><h2>🎙️ 主持人控制台</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
             <div class="flex-row" style="margin:16px 0;">
                 <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">互问互答</button>
                 <button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">抢答活动</button>
             </div>
             <div class="phase-tip">${gameState.activityEnded?'🏁 活动已结束':(act==='rush'?'⚡抢答竞赛':mutual.phaseEnded?'🤝互问互答(已结束)':'🤝互问互答')}</div>
             ${bannerHtml}`;
-        if (!gameState.activityEnded) {
-            if (act==='rush') {
-                if (rush.questionsExhausted) {
-                    content += `<div class="question-area"><div style="font-size:2rem;">📭 题库已空</div><button class="btn btn-primary" id="endActivityBtn">🏁 结束本次活动</button></div>`;
-                } else {
-                    content += `<div class="question-area">
-                        <div>状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
-                        ${rush.currentQuestion?`<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`:'<div>暂无题目</div>'}
-                        <div id="rushTimer" class="timer">⏰ 倒计时: ${formatTime(rushCountdown)}</div>
-                        <div class="flex-row" style="margin-top:12px;">
-                            <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button>
-                            <button class="btn btn-outline" id="skipRushBtn" ${(rush.roundState!=='RUSHING'&&rush.roundState!=='ANSWERING')?'disabled':''}>跳过本题</button>
-                        </div></div>`;
-                }
+        if(!gameState.activityEnded) {
+            if(act==='rush') {
+                if(rush.questionsExhausted) content += `<div class="question-area"><div style="font-size:2rem;">📭 题库已空</div><button class="btn btn-primary" id="endActivityBtn">🏁 结束本次活动</button></div>`;
+                else content += `<div class="question-area"><div>状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
+                    ${rush.currentQuestion?`<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div>`:'<div>暂无题目</div>'}
+                    <div id="rushTimer" class="timer">⏰ 倒计时: ${formatTime(rushCountdown)}</div>
+                    <div class="flex-row"><button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button><button class="btn btn-outline" id="skipRushBtn" ${(rush.roundState!=='RUSHING'&&rush.roundState!=='ANSWERING')?'disabled':''}>跳过本题</button></div></div>`;
             } else {
-                const drawTeam = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
-                const answerTeam = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
-                content += `<div class="question-area">
-                    <div class="phase-tip" style="font-size:1.3rem;">🎲 抽题队伍：${drawTeam?.name} &nbsp; 🎯 答题队伍：${answerTeam?.name}</div>
+                const drawTeam = gameState.players.find(p=>p.id===mutual.currentDrawTeamId), answerTeam = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
+                content += `<div class="question-area"><div class="phase-tip">🎲 抽题队伍：${drawTeam?.name} &nbsp; 🎯 答题队伍：${answerTeam?.name}</div>
                     ${mutual.roundActive?`<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((o,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}</div><div id="mutualTimer" class="timer">⌛ 倒计时: ${formatTime(mutualCountdown)}</div>`:'<div>等待抽题...</div>'}
                     <button class="btn btn-primary" id="drawBtn" ${(mutual.roundActive||mutual.phaseEnded)?'disabled':''}>📖 抽取题目</button></div>`;
             }
         }
         content += `<div class="team-grid">${gameState.players.map(renderTeamCard).join('')}</div></div>`;
         document.getElementById('app').innerHTML = content;
-        if (!gameState.activityEnded) {
+        if(!gameState.activityEnded) {
             document.getElementById('selectRush').onclick = () => { if(gameState.currentActivity!=='rush') sendMessage({type:'HOST_ACTION',action:'selectActivity',payload:'rush'}); };
             document.getElementById('selectMutual').onclick = () => { if(gameState.currentActivity!=='mutual') sendMessage({type:'HOST_ACTION',action:'selectActivity',payload:'mutual'}); };
-            if (act==='rush') {
-                if (rush.questionsExhausted) document.getElementById('endActivityBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'endActivity'});
-                else {
-                    document.getElementById('startRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'startRush'});
-                    document.getElementById('skipRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'skipRush'});
-                }
-            } else {
-                document.getElementById('drawBtn').onclick = () => { const btn=document.getElementById('drawBtn'); btn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:mutual.currentDrawTeamId}}); setTimeout(()=>btn.classList.remove('draw-anim'),600); };
-            }
+            if(act==='rush') {
+                if(rush.questionsExhausted) document.getElementById('endActivityBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'endActivity'});
+                else { document.getElementById('startRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'startRush'}); document.getElementById('skipRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'skipRush'}); }
+            } else document.getElementById('drawBtn').onclick = () => { const btn=document.getElementById('drawBtn'); btn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:mutual.currentDrawTeamId}}); };
         }
         document.getElementById('logoutBtn').onclick = () => { window.location.href='/'; };
     }
 
-    // ============ 选手主界面 ============
+    // 选手主界面
     function renderPlayerMain() {
         const player = gameState.players.find(p=>p.id===currentPlayer.id);
         if(!player) return;
-        if (gameState.activityEnded) {
-            document.getElementById('app').innerHTML = `<div class="panel"><div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div></div>`;
-            return;
-        }
+        if(gameState.activityEnded) { document.getElementById('app').innerHTML = `<div class="panel"><div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div></div>`; return; }
         const act = gameState.currentActivity, rush = gameState.rush, mutual = gameState.mutual;
         let canBuzz=false, canAnswer=false, showBuzz=(act==='rush');
         let qHtml='<div>等待主持人开始...</div>', optHtml='', timerHtml='', special='';
@@ -333,38 +241,36 @@
             }
         }
         let bannerHtml = '';
-        if (activeBanner) {
-            const cls = activeBanner.type === 'correct' ? 'correct' : (activeBanner.type === 'wrong' ? 'wrong' : 'buzz');
-            bannerHtml = `<div class="result-banner ${cls}">${activeBanner.message}</div>`;
+        if(gameState.lastBuzzWinner?.timestamp+4000 > Date.now()) bannerHtml += `<div class="result-banner buzz">🏆 ${gameState.lastBuzzWinner.teamName} 抢答成功</div>`;
+        if(gameState.lastAnswerResult?.timestamp && gameState.lastAnswerResult.timestamp+4000 > Date.now()) {
+            const cls = gameState.lastAnswerResult.isCorrect ? 'correct' : 'wrong';
+            bannerHtml += `<div class="result-banner ${cls}">${gameState.lastAnswerResult.message}</div>`;
         }
-        const html = `<div class="panel">
-            <div class="flex-row"><h2>${player.emoji} ${player.name} (${currentPlayer.playerName})</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
+        const html = `<div class="panel"><div class="flex-row"><h2>${player.emoji} ${player.name} (${currentPlayer.playerName})</h2><button class="btn btn-outline btn-sm" id="logoutBtn">退出</button></div>
             <div class="phase-tip">${act==='rush'?'⚡抢答':'🤝互问互答'}</div>
             ${bannerHtml}
             <div class="question-area">${qHtml}${optHtml}${timerHtml}${special}</div>
             ${showBuzz?`<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>`:''}
             <div class="team-grid">${gameState.players.map(renderTeamCard).join('')}</div></div>`;
         document.getElementById('app').innerHTML = html;
-
         if(showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({type:'PLAYER_RUSH',playerId:player.id,playerName:currentPlayer.playerName});
         const optsDiv = document.getElementById('opts');
-        if (optsDiv && canAnswer && !answerLocked) {
+        if(optsDiv && canAnswer && !answerLocked) {
             optsDiv.querySelectorAll('.option').forEach(opt => {
                 opt.onclick = function() {
-                    if (answerLocked) return;
+                    if(answerLocked) return;
                     answerLocked = true;
                     optsDiv.querySelectorAll('.option').forEach(o => o.classList.add('disabled'));
-                    const selectedIndex = parseInt(this.dataset.opt);
-                    sendMessage({type:'PLAYER_ANSWER', playerId:player.id, playerName:currentPlayer.playerName, answerIndex:selectedIndex});
+                    sendMessage({type:'PLAYER_ANSWER', playerId:player.id, playerName:currentPlayer.playerName, answerIndex:parseInt(this.dataset.opt)});
                 };
             });
         }
         const drawBtn = document.getElementById('drawBtn');
-        if(drawBtn) drawBtn.onclick = () => { drawBtn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}}); setTimeout(()=>drawBtn.classList.remove('draw-anim'),600); };
+        if(drawBtn) drawBtn.onclick = () => { drawBtn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}}); };
         document.getElementById('logoutBtn').onclick = () => { currentPlayer=null; playerLoginRendered=false; window.location.href='?role=player'; };
     }
 
-    // ============ 管理员界面（完整保留） ============
+    // 管理员界面
     let adminTab = 'scores';
     async function renderAdmin() {
         document.getElementById('app').innerHTML = `<div class="panel"><h2>📊 管理员后台</h2>
@@ -387,8 +293,8 @@
     }
     async function renderAdminContent() {
         const div = document.getElementById('adminContent');
-        if (!div) return;
-        if (adminTab === 'scores') {
+        if(!div) return;
+        if(adminTab==='scores') {
             const scores = await fetch('/api/scores').then(r=>r.json());
             div.innerHTML = `<h3>🏆 分数总览</h3><table><tr><th>队伍</th><th>总分</th><th>队员</th></tr>${scores.map(s=>`<tr><td>${s.emoji} ${s.name}</td><td>${s.score}</td><td>${s.members.join('、')||'无'}</td></tr>`).join('')}</table><button class="btn btn-primary btn-sm" id="exportExcel">📥 导出Excel</button>`;
             document.getElementById('exportExcel').onclick = () => {
@@ -398,12 +304,34 @@
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "分数");
                 XLSX.writeFile(wb, "分数总览.xlsx");
             };
-        } else if (adminTab === 'rushQuestions' || adminTab === 'mutualQuestions') {
-            const type = adminTab === 'rushQuestions' ? 'rush' : 'mutual';
+        } else if(adminTab==='rushQuestions'||adminTab==='mutualQuestions') {
+            const type = adminTab==='rushQuestions'?'rush':'mutual';
             const questions = await fetch(`/api/${type}-questions`).then(r=>r.json());
-            div.innerHTML = `<h3>${type==='rush'?'抢答':'互问'}题库 (${questions.length}题)</h3><button class="btn btn-sm btn-primary" id="addQ">+新增</button>
+            div.innerHTML = `<h3>${type==='rush'?'抢答':'互问'}题库 (${questions.length}题)</h3>
+                <div class="flex-row" style="justify-content:space-between;">
+                    <button class="btn btn-sm btn-primary" id="addQ">+ 新增</button>
+                    <div>
+                        <button class="btn btn-sm btn-outline" id="importBtn">📥 导入JSON</button>
+                        <button class="btn btn-sm btn-outline" id="exportBtn">📤 导出JSON</button>
+                    </div>
+                </div>
                 <table>${questions.length===0?'<tr><td>暂无题目</td></tr>':`<tr><th>题目</th><th>类型</th><th>选项</th><th>答案</th><th>操作</th></tr>${questions.map(q=>`<tr><td>${q.question}</td><td>${q.type}</td><td>${q.options.join(' | ')}</td><td>${q.type==='判断题'?(q.answer===0?'正确':'错误'):q.options[q.answer]}</td><td><button class="btn btn-sm editQ" data-id="${q.id}">✏️</button> <button class="btn btn-sm btn-danger delQ" data-id="${q.id}">🗑</button></td></tr>`).join('')}`}</table>`;
             document.getElementById('addQ').onclick = () => showQuestionModal(type);
+            document.getElementById('importBtn').onclick = () => {
+                const input = document.createElement('input'); input.type='file'; input.accept='.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0]; if(!file) return;
+                    const text = await file.text(); const arr = JSON.parse(text);
+                    for(const q of arr) await fetch(`/api/${type}-questions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q)});
+                    renderAdminContent();
+                };
+                input.click();
+            };
+            document.getElementById('exportBtn').onclick = async () => {
+                const data = await fetch(`/api/${type}-questions`).then(r=>r.json());
+                const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+                const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${type}_questions.json`; a.click();
+            };
             document.querySelectorAll('.editQ').forEach(b => b.onclick = async () => {
                 const q = await fetch(`/api/${type}-questions`).then(r=>r.json()).then(list=>list.find(x=>x.id===b.dataset.id));
                 showQuestionModal(type, q);
@@ -412,10 +340,10 @@
                 if(confirm('删除？')) await fetch(`/api/${type}-questions/${b.dataset.id}`,{method:'DELETE'});
                 renderAdminContent();
             });
-        } else if (adminTab === 'history') {
+        } else if(adminTab==='history') {
             const history = await fetch('/api/history').then(r=>r.json());
             div.innerHTML = `<h3>答题记录 (${history.length}条)</h3><table>${history.length===0?'<tr><td>暂无</td></tr>':`<tr><th>时间</th><th>活动</th><th>队伍</th><th>选手</th><th>题目</th><th>答案</th><th>结果</th><th>分数</th></tr>${history.map(h=>`<tr><td>${new Date(h.timestamp).toLocaleTimeString()}</td><td>${h.activityType}</td><td>${h.teamName}</td><td>${h.playerName}</td><td>${h.question}</td><td>${h.selectedAnswer}</td><td>${h.isCorrect?'✅':'❌'}</td><td>${h.scoreDelta}</td></tr>`).join('')}`}</table>`;
-        } else if (adminTab === 'members') {
+        } else if(adminTab==='members') {
             const members = await fetch('/api/team-members').then(r=>r.json());
             div.innerHTML = `<h3>队伍成员</h3>${gameState.players.map(p => {
                 const list = members[p.id]||[];
@@ -444,34 +372,22 @@
             <button class="btn btn-primary" id="saveQ">保存</button><button class="btn btn-outline" id="cancelQ">取消</button></div>`;
         document.body.appendChild(modal);
         const updateAns = () => {
-            const type = document.getElementById('qType').value;
-            const sel = document.getElementById('qAnswer');
+            const type = document.getElementById('qType').value, sel = document.getElementById('qAnswer');
             if(type==='判断题') sel.innerHTML = '<option value="0">正确</option><option value="1">错误</option>';
-            else {
-                const opts = [...document.querySelectorAll('.qOpt')].map(o=>o.value).filter(v=>v);
-                sel.innerHTML = opts.map((o,i)=>`<option value="${i}">${o}</option>`).join('');
-            }
+            else { const opts = [...document.querySelectorAll('.qOpt')].map(o=>o.value).filter(v=>v); sel.innerHTML = opts.map((o,i)=>`<option value="${i}">${o}</option>`).join(''); }
         };
-        document.getElementById('qType').onchange = function() {
-            document.getElementById('optsDiv').innerHTML = this.value==='判断题'?'':['A','B','C','D'].map(l=>`<input class="qOpt" placeholder="选项${l}">`).join('');
-            updateAns();
-        };
+        document.getElementById('qType').onchange = function() { document.getElementById('optsDiv').innerHTML = this.value==='判断题'?'':['A','B','C','D'].map(l=>`<input class="qOpt" placeholder="选项${l}">`).join(''); updateAns(); };
         updateAns();
-        if(q) {
-            if(q.type==='判断题') document.getElementById('qAnswer').value = q.answer;
-            else setTimeout(() => { const opts = document.querySelectorAll('.qOpt'); q.options.forEach((o,i)=>{ if(opts[i]) opts[i].value = o; }); document.getElementById('qAnswer').value = q.answer; }, 0);
-        }
+        if(q) { if(q.type==='判断题') document.getElementById('qAnswer').value = q.answer; else setTimeout(() => { const opts = document.querySelectorAll('.qOpt'); q.options.forEach((o,i)=>{ if(opts[i]) opts[i].value = o; }); document.getElementById('qAnswer').value = q.answer; },0); }
         document.getElementById('saveQ').onclick = async () => {
-            const type = document.getElementById('qType').value;
-            const question = document.getElementById('qQuestion').value.trim();
+            const type = document.getElementById('qType').value, question = document.getElementById('qQuestion').value.trim();
             let options, answer;
             if(type==='判断题') { options=['正确','错误']; answer=parseInt(document.getElementById('qAnswer').value); }
             else { options = [...document.querySelectorAll('.qOpt')].map(o=>o.value.trim()).filter(v=>v); answer=parseInt(document.getElementById('qAnswer').value); }
             const payload = {type, question, options, answer};
             if(q) await fetch(`/api/${type}-questions/${q.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
             else await fetch(`/api/${type}-questions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-            document.body.removeChild(modal);
-            renderAdminContent();
+            document.body.removeChild(modal); renderAdminContent();
         };
         document.getElementById('cancelQ').onclick = () => document.body.removeChild(modal);
         modal.onclick = (e) => { if(e.target===modal) document.body.removeChild(modal); };
@@ -480,10 +396,8 @@
     function renderFullPage() {
         if(!gameState) return;
         if(role==='host') renderHost();
-        else if(role==='player') {
-            if(!currentPlayer) renderPlayerLogin();
-            else renderPlayerMain();
-        } else if(role==='admin') renderAdmin();
+        else if(role==='player') { if(!currentPlayer) renderPlayerLogin(); else renderPlayerMain(); }
+        else if(role==='admin') renderAdmin();
         else renderLogin();
     }
 
