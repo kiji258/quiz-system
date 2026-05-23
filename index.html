@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>安全知识竞赛 - 完整版</title>
+    <title>安全知识竞赛 - 终极版</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
         body { font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif; background:#0b0f17; color:#e2e8f0; padding:16px; }
@@ -17,28 +17,24 @@
         .team-card { background:#1a1f2e; border-radius:20px; padding:8px; text-align:center; border-left:4px solid; }
         .score-big { font-size:2rem; font-weight:800; }
         .question-area { background:#0f172a; border-radius:28px; padding:20px; margin:16px 0; }
-        .q-text { font-size:2.8rem; font-weight:700; margin:12px 0; word-break:break-word; line-height:1.3; }
+        .q-text { font-size:2.5rem; font-weight:700; margin:12px 0; word-break:break-word; }
         .options { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
-        .option { background:#1e293b; border-radius:60px; padding:14px 20px; font-size:1.4rem; cursor:pointer; transition:0.1s; }
+        .option { background:#1e293b; border-radius:60px; padding:12px 20px; font-size:1.2rem; cursor:pointer; transition:0.1s; }
         .option:active { transform:scale(0.98); background:#334155; }
         .buzz-btn { background:radial-gradient(circle at 30%20%, #f0c040, #d97706); border:none; border-radius:120px; padding:20px; font-size:2rem; font-weight:900; width:100%; margin:20px 0; cursor:pointer; }
         .buzz-btn.disabled { opacity:0.5; pointer-events:none; }
         .timer { font-size:1.8rem; font-weight:bold; color:#f0c040; text-align:center; margin:10px 0; font-family: monospace; background:#00000066; padding:8px; border-radius:60px; }
         .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:3px solid #f0c040; padding:12px 28px; border-radius:60px; z-index:2000; animation:fadeOut 3s forwards; font-weight:bold; font-size:1.2rem; }
         @keyframes fadeOut { 0%{opacity:1;} 100%{opacity:0;visibility:hidden;} }
-        .result-banner { text-align:center; padding:20px; margin:16px 0; border-radius:60px; font-weight:900; font-size:2rem; animation: fadeOutResult 4s forwards; }
+        .result-banner { text-align:center; padding:20px; margin:16px 0; border-radius:60px; font-weight:900; font-size:1.8rem; animation: fadeOutResult 4s forwards; }
         .result-banner.correct { background:#10b981; color:white; border:4px solid #f0c040; }
         .result-banner.wrong { background:#ef4444; color:white; border:4px solid #f0c040; }
-        .result-banner.buzz { background:#f0c040; color:#1e1a0a; font-size:2.2rem; }
-        @keyframes fadeOutResult {
-            0% { opacity:1; transform:scale(1); }
-            80% { opacity:1; transform:scale(1); }
-            100% { opacity:0; transform:scale(0.9); visibility:hidden; }
-        }
+        .result-banner.buzz { background:#f0c040; color:#1e1a0a; font-size:2rem; }
+        @keyframes fadeOutResult { 0%{opacity:1;} 80%{opacity:1;} 100%{opacity:0; visibility:hidden;} }
         .phase-tip { font-size:1.5rem; font-weight:bold; text-align:center; margin:8px 0; color:#f0c040; }
         table { width:100%; border-collapse:collapse; margin-top:16px; background:#0f172a; }
         th, td { border:1px solid #334155; padding:8px; text-align:center; vertical-align:middle; }
-        input, select, textarea { background:#1e293b; border:1px solid #475569; color:white; padding:8px; border-radius:20px; }
+        input, select { background:#1e293b; border:1px solid #475569; color:white; padding:8px; border-radius:20px; }
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000; }
         .modal-card { background:#111827; border-radius:32px; padding:24px; width:90%; max-width:500px; }
     </style>
@@ -51,14 +47,13 @@
         let role = urlParams.get('role');
         let ws = null;
         let gameState = null;
-        let currentPlayer = null;
+        let currentPlayer = null; // { id, name, playerName }
         let timerInterval = null;
-        let currentAdminTab = 'rush'; // 'rush', 'mutual', 'history'
+        let currentAdminTab = 'rush';
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${location.host}`;
 
-        // ---------- 辅助函数 ----------
         function hasActiveCountdown() {
             if (!gameState) return false;
             if (gameState.currentActivity === 'rush') {
@@ -79,7 +74,6 @@
                     timerInterval = setInterval(() => {
                         if (hasActiveCountdown()) scheduleRender();
                         else { clearInterval(timerInterval); timerInterval = null; scheduleRender(); }
-                        // 超时检测
                         if (gameState && gameState.currentActivity === 'rush') {
                             const rush = gameState.rush;
                             if (rush.roundState === 'ANSWERING' && rush.answerEndTime && Date.now() > rush.answerEndTime)
@@ -124,13 +118,13 @@
             setTimeout(() => t.remove(), 3000);
         }
 
-        // ---------- HTTP API ----------
+        // API
         async function apiGet(url) { const res = await fetch(url); return res.json(); }
         async function apiPost(url, data) { return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(r=>r.json()); }
         async function apiPut(url, data) { return fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(r=>r.json()); }
         async function apiDelete(url) { return fetch(url, { method:'DELETE' }).then(r=>r.json()); }
 
-        // ---------- 登录界面 ----------
+        // 登录界面
         function renderLogin() {
             document.getElementById('app').innerHTML = `
                 <div class="login-panel" style="max-width:400px; margin:10vh auto;">
@@ -141,8 +135,8 @@
                         <button class="btn btn-outline" id="playerBtn" style="width:100%;">👥 参赛选手</button>
                     </div>
                     <div id="passwordDiv" class="hidden">
-                        <input type="password" id="password" placeholder="密码" style="width:100%; padding:12px; border-radius:40px; margin-bottom:12px;">
-                        <button class="btn btn-primary" id="submitPwd">确认</button>
+                        <input type="password" id="password" placeholder="密码" style="width:100%; padding:12px; border-radius:40px;">
+                        <button class="btn btn-primary" id="submitPwd" style="margin-top:8px;">确认</button>
                     </div>
                 </div>
             `;
@@ -157,7 +151,7 @@
             };
         }
 
-        // ---------- 主持人界面 ----------
+        // 主持人界面
         function renderHost() {
             if (!gameState) return;
             const act = gameState.currentActivity;
@@ -165,7 +159,7 @@
             const mutual = gameState.mutual;
             let resultHtml = '';
             if (gameState.lastBuzzWinner && gameState.lastBuzzWinner.timestamp + 4000 > Date.now()) {
-                resultHtml += `<div class="result-banner buzz">🏆 抢答成功：${gameState.lastBuzzWinner.teamName} 队！🏆</div>`;
+                resultHtml += `<div class="result-banner buzz">🏆 抢答成功：${gameState.lastBuzzWinner.teamName}（${gameState.lastBuzzWinner.playerName || '?'}）🏆</div>`;
             }
             if (gameState.lastAnswerResult && gameState.lastAnswerResult.timestamp && gameState.lastAnswerResult.timestamp + 4000 > Date.now()) {
                 const cls = gameState.lastAnswerResult.isCorrect ? 'correct' : 'wrong';
@@ -227,23 +221,23 @@
             document.getElementById('logoutBtn').onclick = () => { window.location.href = '/'; };
         }
 
-        // ---------- 选手界面 ----------
+        // 选手登录
         function renderPlayerLogin() {
             if (!gameState) return;
             const teams = gameState.players;
             document.getElementById('app').innerHTML = `
                 <div class="login-panel" style="max-width:400px; margin:10vh auto;">
                     <h2>选手登录</h2>
-                    <div><input id="playerName" placeholder="姓名" style="width:100%; padding:12px; margin:10px 0;"></div>
-                    <div><select id="teamSelect" style="width:100%; padding:12px;">${teams.map(t=>`<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('')}</select></div>
+                    <div style="margin:10px 0;"><input id="playerName" placeholder="您的姓名" style="width:100%; padding:12px;"></div>
+                    <div style="margin:10px 0;"><select id="teamSelect" style="width:100%; padding:12px;">${teams.map(t=>`<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('')}</select></div>
                     <button class="btn btn-primary" id="joinBtn">进入赛场</button>
                 </div>
             `;
             document.getElementById('joinBtn').onclick = () => {
-                const name = document.getElementById('playerName').value.trim();
-                if (!name) return alert('请输入姓名');
+                const playerName = document.getElementById('playerName').value.trim();
+                if (!playerName) return alert('请输入姓名');
                 const teamId = parseInt(document.getElementById('teamSelect').value);
-                currentPlayer = { id: teamId, name };
+                currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName };
                 scheduleRender();
             };
         }
@@ -292,7 +286,10 @@
             const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr))">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}; padding:4px"><div>${p.emoji}</div><div>${p.score}</div></div>`).join('')}</div>`;
             const html = `
                 <div class="player-panel">
-                    <div><h2>${player.emoji} ${player.name} (${currentPlayer.name})</h2><button class="btn btn-outline" id="logoutBtn">退出</button></div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <h2>${player.emoji} ${player.name} (${currentPlayer.playerName})</h2>
+                        <button class="btn btn-outline" id="logoutBtn">退出</button>
+                    </div>
                     <div class="phase-tip">${act==='rush'?'⚡抢答活动⚡':'🤝互问互答🤝'}</div>
                     <div class="question-area">${qHtml}${optHtml}${timerHtml}${special}</div>
                     ${showBuzz ? `<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>` : ''}
@@ -300,22 +297,23 @@
                 </div>
             `;
             document.getElementById('app').innerHTML = html;
-            if (showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({ type: 'PLAYER_RUSH', playerId: player.id });
+            if (showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({ type: 'PLAYER_RUSH', playerId: player.id, playerName: currentPlayer.playerName });
             const optsDiv = document.getElementById('opts');
-            if (optsDiv && canAnswer) document.querySelectorAll('.option').forEach(opt => opt.onclick = () => sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, answerIndex: parseInt(opt.dataset.opt) }));
+            if (optsDiv && canAnswer) document.querySelectorAll('.option').forEach(opt => opt.onclick = () => sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, playerName: currentPlayer.playerName, answerIndex: parseInt(opt.dataset.opt) }));
             const drawBtn = document.getElementById('drawBtn');
             if (drawBtn) drawBtn.onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId: player.id } });
             document.getElementById('logoutBtn').onclick = () => { currentPlayer = null; scheduleRender(); };
         }
 
-        // ---------- 管理员界面（完整实现：题库增删改查 + 历史记录 + 分数榜）----------
+        // 管理员界面
         let editingQuestion = null;
         async function renderAdmin() {
             if (!gameState) return;
-            const [rushQs, mutualQs, history] = await Promise.all([
+            const [rushQs, mutualQs, history, teamMembers] = await Promise.all([
                 apiGet('/api/rush-questions'),
                 apiGet('/api/mutual-questions'),
-                apiGet('/api/history')
+                apiGet('/api/history'),
+                apiGet('/api/team-members')
             ]);
             const content = `
                 <div class="admin-panel">
@@ -323,10 +321,11 @@
                         <h2>📊 管理员控制台</h2>
                         <button class="btn btn-outline" id="logoutAdmin">退出</button>
                     </div>
-                    <div style="margin:16px 0; display:flex; gap:10px;">
+                    <div style="margin:16px 0; display:flex; gap:10px; flex-wrap:wrap;">
                         <button class="btn ${currentAdminTab==='rush'?'btn-primary':'btn-outline'}" id="tabRush">抢答题库</button>
                         <button class="btn ${currentAdminTab==='mutual'?'btn-primary':'btn-outline'}" id="tabMutual">互问互答题库</button>
                         <button class="btn ${currentAdminTab==='history'?'btn-primary':'btn-outline'}" id="tabHistory">问答历史</button>
+                        <button class="btn ${currentAdminTab==='members'?'btn-primary':'btn-outline'}" id="tabMembers">队伍成员</button>
                         <button class="btn ${currentAdminTab==='scores'?'btn-primary':'btn-outline'}" id="tabScores">分数总览</button>
                     </div>
                     <div id="adminContent"></div>
@@ -336,47 +335,36 @@
             const container = document.getElementById('adminContent');
 
             if (currentAdminTab === 'history') {
-                container.innerHTML = `
-                    <h3>问答记录</h3>
-                    <table class="score-table">
-                        <thead><tr><th>时间</th><th>活动</th><th>队伍</th><th>题目</th><th>所选答案</th><th>结果</th><th>分值变动</th></tr></thead>
-                        <tbody>${history.map(h => `
-                            <tr>
-                                <td>${new Date(h.timestamp).toLocaleString()}</td>
-                                <td>${h.activityType === 'rush' ? '抢答' : '互问互答'}</td>
-                                <td>${h.teamName}</td>
-                                <td style="max-width:300px;">${h.question}</td>
-                                <td>${h.selectedAnswer}</td>
-                                <td style="color:${h.isCorrect?'#10b981':'#ef4444'}">${h.isCorrect?'正确':'错误'}</td>
-                                <td>${h.scoreDelta>0?`+${h.scoreDelta}`:h.scoreDelta}</td>
-                            </tr>
-                        `).join('')}</tbody>
-                    </table>
-                `;
+                container.innerHTML = `<h3>问答记录（含选手姓名）</h3><table class="score-table"><thead><tr><th>时间</th><th>活动</th><th>队伍</th><th>选手</th><th>题目</th><th>所选答案</th><th>结果</th><th>分值</th></tr></thead><tbody>${history.map(h => `
+                    <tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.activityType === 'rush' ? '抢答' : '互问互答'}</td><td>${h.teamName}</td><td>${h.playerName || '?'}</td><td style="max-width:200px;">${h.question}</td><td>${h.selectedAnswer}</td><td style="color:${h.isCorrect?'#10b981':'#ef4444'}">${h.isCorrect?'正确':'错误'}</td><td>${h.scoreDelta>0?`+${h.scoreDelta}`:h.scoreDelta}</td></tr>
+                `).join('')}</tbody></table>`;
+            } else if (currentAdminTab === 'members') {
+                let membersHtml = `<h3>队伍成员管理</h3><div class="team-grid">`;
+                for (const [tid, members] of Object.entries(teamMembers)) {
+                    const team = gameState.players.find(p => p.id == tid);
+                    membersHtml += `<div class="team-card" style="border-left-color:${team?.color}"><strong>${team?.name}</strong><div>成员：${members.join(', ') || '无'}</div><button class="btn btn-outline btn-sm addMemberBtn" data-team="${tid}">添加成员</button></div>`;
+                }
+                membersHtml += `</div>`;
+                container.innerHTML = membersHtml;
+                document.querySelectorAll('.addMemberBtn').forEach(btn => {
+                    btn.onclick = () => {
+                        const teamId = btn.dataset.team;
+                        const name = prompt('输入选手姓名');
+                        if (name) {
+                            apiPost(`/api/team-members/${teamId}`, { playerName: name }).then(() => renderAdmin());
+                        }
+                    };
+                });
             } else if (currentAdminTab === 'scores') {
-                container.innerHTML = `
-                    <h3>当前队伍分数</h3>
-                    <div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));">
-                        ${gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('')}
-                    </div>
-                `;
+                container.innerHTML = `<h3>当前分数</h3><div class="team-grid">${gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('')}</div>`;
             } else {
                 const qs = currentAdminTab === 'rush' ? rushQs : mutualQs;
                 const qType = currentAdminTab === 'rush' ? 'rush' : 'mutual';
                 container.innerHTML = `
                     <div style="margin-bottom:16px;"><button class="btn btn-primary" id="addQuestionBtn">➕ 新增题目</button></div>
-                    <table class="score-table">
-                        <thead><tr><th>题目</th><th>类型</th><th>选项</th><th>答案</th><th>操作</th></tr></thead>
-                        <tbody>${qs.map(q => `
-                            <tr>
-                                <td>${q.question}</td>
-                                <td>${q.type}</td>
-                                <td>${q.options.join(' | ')}</td>
-                                <td>${q.options[q.answer]}</td>
-                                <td><button class="btn btn-outline btn-sm editBtn" data-id="${q.id}">编辑</button> <button class="btn btn-danger btn-sm delBtn" data-id="${q.id}">删除</button></td>
-                            </tr>
-                        `).join('')}</tbody>
-                    </table>
+                    <table class="score-table"><thead><tr><th>题目</th><th>类型</th><th>选项</th><th>答案</th><th>操作</th></tr></thead><tbody>${qs.map(q => `
+                        <tr><td>${q.question}</td><td>${q.type}</td><td>${q.options.join(' | ')}</td><td>${q.options[q.answer]}</td><td><button class="btn btn-outline editBtn" data-id="${q.id}">编辑</button> <button class="btn btn-danger delBtn" data-id="${q.id}">删除</button></td></tr>
+                    `).join('')}</tbody></table>
                 `;
                 document.getElementById('addQuestionBtn').onclick = () => showQuestionModal(null, qType);
                 document.querySelectorAll('.editBtn').forEach(btn => btn.onclick = () => {
@@ -395,6 +383,7 @@
             document.getElementById('tabRush').onclick = () => { currentAdminTab = 'rush'; renderAdmin(); };
             document.getElementById('tabMutual').onclick = () => { currentAdminTab = 'mutual'; renderAdmin(); };
             document.getElementById('tabHistory').onclick = () => { currentAdminTab = 'history'; renderAdmin(); };
+            document.getElementById('tabMembers').onclick = () => { currentAdminTab = 'members'; renderAdmin(); };
             document.getElementById('tabScores').onclick = () => { currentAdminTab = 'scores'; renderAdmin(); };
             document.getElementById('logoutAdmin').onclick = () => { window.location.href = '/'; };
         }
@@ -406,10 +395,10 @@
             modal.innerHTML = `
                 <div class="modal-card">
                     <h3>${isEdit ? '编辑题目' : '新增题目'}</h3>
-                    <div><label>题目类型</label><select id="qType"><option value="选择题">选择题</option><option value="判断题">判断题</option></select></div>
-                    <div><label>题目文本</label><input id="qText" value="${existing ? existing.question : ''}" style="width:100%;"></div>
-                    <div><label>选项（用|分隔）</label><input id="qOptions" value="${existing ? existing.options.join('|') : '选项A|选项B|选项C|选项D'}" style="width:100%;"></div>
-                    <div><label>正确答案（0索引）</label><input id="qAnswer" value="${existing ? existing.answer : 0}" style="width:100%;"></div>
+                    <div><label>类型</label><select id="qType"><option value="选择题">选择题</option><option value="判断题">判断题</option></select></div>
+                    <div><label>题目</label><input id="qText" value="${existing ? existing.question : ''}" style="width:100%;"></div>
+                    <div><label>选项（用|分隔）</label><input id="qOptions" value="${existing ? existing.options.join('|') : '正确|错误'}" style="width:100%;"></div>
+                    <div><label>正确答案索引（0开始）</label><input id="qAnswer" value="${existing ? existing.answer : 0}" style="width:100%;"></div>
                     <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
                         <button class="btn btn-outline" id="cancelBtn">取消</button>
                         <button class="btn btn-primary" id="saveBtn">保存</button>
@@ -417,9 +406,7 @@
                 </div>
             `;
             document.body.appendChild(modal);
-            if (existing) {
-                document.getElementById('qType').value = existing.type;
-            }
+            document.getElementById('qType').value = existing ? existing.type : '选择题';
             document.getElementById('cancelBtn').onclick = () => modal.remove();
             document.getElementById('saveBtn').onclick = async () => {
                 const type = document.getElementById('qType').value;
