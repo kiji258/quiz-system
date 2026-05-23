@@ -5,42 +5,148 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>知识竞赛 - 主持人与选手</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif; background: #0b0f17; color: #e2e8f0; padding: 16px; }
+        /* 重置样式，确保输入框不受干扰 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: #0b0f17;
+            color: #e2e8f0;
+            padding: 16px;
+        }
+
         .container { max-width: 1300px; margin: 0 auto; }
         .hidden { display: none !important; }
-        .btn { padding: 8px 18px; border-radius: 40px; font-weight: bold; border: none; cursor: pointer; transition: 0.1s; }
+
+        /* 按钮通用 */
+        .btn {
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            transition: 0.1s;
+        }
         .btn-primary { background: #f0c040; color: #1e1a0a; }
         .btn-danger { background: #ef4444; color: white; }
         .btn-success { background: #10b981; color: white; }
         .btn-outline { background: transparent; border: 1px solid #64748b; color: #cbd5e1; }
         .btn:active { transform: scale(0.96); }
+
         /* 主持人样式 */
-        .host-layout .stage-card { background: #111827; border-radius: 28px; padding: 20px; margin-bottom: 20px; border: 2px solid #334155; transition: 0.2s; }
+        .host-layout .stage-card {
+            background: #111827;
+            border-radius: 28px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #334155;
+            transition: 0.2s;
+        }
         .host-layout .stage-card.state-ready { border-color: #f59e0b; }
         .host-layout .stage-card.state-buzzed { border-color: #ef4444; }
         .host-layout .stage-card.state-correct { border-color: #10b981; }
         .host-layout .stage-card.state-wrong { border-color: #ef4444; }
         .q-text { font-size: 1.5rem; font-weight: 700; margin: 12px 0; word-break: break-word; }
         .options-grid { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-        .opt-item { background: #1a1f2e; border-radius: 60px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
-        .opt-label { width: 32px; height: 32px; background: #2d3a5e; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
+        .opt-item {
+            background: #1a1f2e;
+            border-radius: 60px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .opt-label {
+            width: 32px;
+            height: 32px;
+            background: #2d3a5e;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
         .opt-item.highlight-correct { border: 2px solid #10b981; background: rgba(16,185,129,0.2); }
-        .teams-grid-host { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; background: #0f172a; border-radius: 24px; padding: 16px; max-height: 50vh; overflow-y: auto; }
-        .team-card-host { background: #1a1f2e; border-radius: 20px; padding: 8px; text-align: center; border-left: 4px solid; }
+        .teams-grid-host {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            background: #0f172a;
+            border-radius: 24px;
+            padding: 16px;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+        .team-card-host {
+            background: #1a1f2e;
+            border-radius: 20px;
+            padding: 8px;
+            text-align: center;
+            border-left: 4px solid;
+        }
         .team-score { font-size: 1.8rem; font-weight: 800; }
-        .control-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; justify-content: center; }
-        .question-nav { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+        .control-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 16px 0;
+            justify-content: center;
+        }
+        .question-nav {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
         /* 选手样式 */
         .player-view { max-width: 500px; margin: 0 auto; text-align: center; }
-        .player-score-card { background: #111827; border-radius: 40px; padding: 16px; margin-bottom: 20px; }
-        .big-buzz-btn { background: radial-gradient(circle at 30% 20%, #f0c040, #d97706); border: none; border-radius: 120px; padding: 28px 20px; font-size: 2.2rem; font-weight: 900; width: 100%; margin: 20px 0; cursor: pointer; transition: 0.05s linear; }
+        .player-score-card {
+            background: #111827;
+            border-radius: 40px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .big-buzz-btn {
+            background: radial-gradient(circle at 30% 20%, #f0c040, #d97706);
+            border: none;
+            border-radius: 120px;
+            padding: 28px 20px;
+            font-size: 2.2rem;
+            font-weight: 900;
+            width: 100%;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: 0.05s linear;
+        }
         .big-buzz-btn:active { transform: scale(0.96); }
         .big-buzz-btn.disabled { opacity: 0.4; pointer-events: none; background: #555; }
-        .login-panel { background: #111827; border-radius: 32px; padding: 32px; max-width: 480px; margin: 10vh auto; text-align: center; }
-        .input-group { margin: 16px 0; text-align: left; }
-        .input-group label { display: block; margin-bottom: 6px; color: #cbd5e1; }
-        /* 关键修复：强制输入框可聚焦、可输入 */
+
+        /* 登录面板 - 关键修复：确保输入框完全可交互 */
+        .login-panel {
+            background: #111827;
+            border-radius: 32px;
+            padding: 32px;
+            max-width: 480px;
+            margin: 10vh auto;
+            text-align: center;
+        }
+        .input-group {
+            margin: 16px 0;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #cbd5e1;
+        }
+        /* 核心修复：强制输入框和下拉框可聚焦、可输入 */
         select, input, textarea {
             width: 100%;
             padding: 12px;
@@ -49,17 +155,40 @@
             background: #1e293b;
             color: white;
             font-size: 1rem;
+            /* 覆盖任何可能阻止交互的样式 */
             pointer-events: auto !important;
             user-select: text !important;
             -webkit-user-select: text !important;
             touch-action: manipulation !important;
+            opacity: 1 !important;
+            z-index: 10;
         }
         input:focus, select:focus {
             outline: none;
             border-color: #f0c040;
         }
-        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #f0c040; padding: 8px 20px; border-radius: 30px; z-index: 2000; animation: fadeOut 2s forwards; }
-        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        /* 确保没有任何覆盖层拦截点击 */
+        .login-panel * {
+            pointer-events: auto;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid #f0c040;
+            padding: 8px 20px;
+            border-radius: 30px;
+            z-index: 2000;
+            animation: fadeOut 2s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
     </style>
 </head>
 <body>
@@ -103,7 +232,7 @@
         return gameState.questions[gameState.currentQIndex];
     }
 
-    // ==================== 主持人界面（简化，与之前相同）====================
+    // ==================== 主持人界面 ====================
     function renderHost() {
         const q = getCurrentQ();
         const qStatus = q ? gameState.questionStatus[q.id] : null;
@@ -316,7 +445,7 @@
         };
     }
 
-    // ==================== 选手登录界面 ====================
+    // ==================== 选手登录界面（彻底修复输入框） ====================
     function renderLogin() {
         if (!gameState) {
             document.getElementById('app').innerHTML = '<div style="text-align:center; margin-top:50px;">加载中...</div>';
@@ -340,7 +469,25 @@
             </div>
         `;
         document.getElementById('app').innerHTML = html;
-        // 绑定事件时确保输入框可以聚焦
+
+        // 确保输入框和下拉框可以正常点击，不阻止默认行为
+        const nameInput = document.getElementById('playerName');
+        const teamSelect = document.getElementById('teamSelect');
+        if (nameInput) {
+            nameInput.addEventListener('touchstart', (e) => {
+                // 不阻止冒泡，让浏览器默认聚焦
+                e.stopPropagation();
+            });
+            nameInput.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+        if (teamSelect) {
+            teamSelect.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         document.getElementById('joinBtn').onclick = () => {
             const name = document.getElementById('playerName').value.trim();
             if (!name) { alert('请输入姓名'); return; }
@@ -348,14 +495,6 @@
             currentPlayer = { id: teamId, name: name };
             render();
         };
-        // 额外：确保输入框可点击
-        const nameInput = document.getElementById('playerName');
-        if (nameInput) {
-            nameInput.addEventListener('touchstart', (e) => {
-                e.stopPropagation();
-                nameInput.focus();
-            });
-        }
     }
 
     // ==================== 主渲染分发 ====================
@@ -386,6 +525,7 @@
     }
 
     connectWebSocket();
+    // 每 200ms 刷新一次界面（状态同步）
     setInterval(() => { if (gameState) render(); }, 200);
 </script>
 </body>
