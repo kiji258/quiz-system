@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>安全知识竞赛</title>
+    <title>安全知识竞赛 - 毫秒级倒计时</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
         body { font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif; background:#0b0f17; color:#e2e8f0; padding:16px; }
@@ -27,7 +27,7 @@
         .option.disabled { opacity:0.5; pointer-events:none; }
         .buzz-btn { background:radial-gradient(circle at 30%20%, #f0c040, #d97706); border:none; border-radius:120px; padding:20px; font-size:2rem; font-weight:900; width:100%; margin:20px 0; cursor:pointer; }
         .buzz-btn.disabled { opacity:0.5; pointer-events:none; }
-        .timer { font-size:1.2rem; font-weight:bold; color:#f0c040; text-align:center; margin:10px 0; }
+        .timer { font-size:1.3rem; font-weight:bold; color:#f0c040; text-align:center; margin:10px 0; font-family: monospace; }
         .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:1px solid #f0c040; padding:8px 20px; border-radius:30px; z-index:2000; animation:fadeOut 2s forwards; }
         @keyframes fadeOut { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0;visibility:hidden} }
         .score-table { width:100%; border-collapse:collapse; }
@@ -41,11 +41,60 @@
     let role = urlParams.get('role');
     let ws = null;
     let gameState = null;
-    let currentPlayer = null; // { id, name }
-    let answerTimeout = null;
+    let currentPlayer = null;
+    let highFreqTimer = null;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}`;
+
+    // 检查当前是否需要高频刷新（倒计时活跃中）
+    function isCountdownActive() {
+        if (!gameState) return false;
+        const act = gameState.currentActivity;
+        if (act === 'rush') {
+            const rush = gameState.rush;
+            if (rush.roundState === 'RUSHING' || rush.roundState === 'ANSWERING') {
+                // 检查剩余时间是否大于0（避免已超时但状态未及时更新）
+                const now = Date.now();
+                if (rush.roundState === 'RUSHING' && rush.rushEndTime > now) return true;
+                if (rush.roundState === 'ANSWERING' && rush.answerEndTime > now) return true;
+            }
+        } else if (act === 'mutual') {
+            const mutual = gameState.mutual;
+            if (mutual.roundActive && mutual.answerEndTime > Date.now()) return true;
+        }
+        return false;
+    }
+
+    function startHighFreqTimer() {
+        if (highFreqTimer) return;
+        highFreqTimer = setInterval(() => {
+            if (isCountdownActive() && (role === 'player' || role === 'host')) {
+                render(); // 倒计时进行中，高频刷新
+            } else {
+                // 倒计时已结束，停止高频计时器
+                stopHighFreqTimer();
+                // 额外渲染一次以确保界面状态更新
+                render();
+            }
+        }, 100);
+    }
+
+    function stopHighFreqTimer() {
+        if (highFreqTimer) {
+            clearInterval(highFreqTimer);
+            highFreqTimer = null;
+        }
+    }
+
+    // 每次渲染后检查计时器状态
+    function manageTimer() {
+        if (isCountdownActive()) {
+            startHighFreqTimer();
+        } else {
+            stopHighFreqTimer();
+        }
+    }
 
     function connectWebSocket() {
         ws = new WebSocket(wsUrl);
@@ -55,9 +104,11 @@
             if (data.type === 'STATE') {
                 gameState = data.state;
                 render();
+                manageTimer();  // 状态变化后重新评估计时器
             } else if (data.type === 'ANSWER_RESULT') {
                 showToast(data.result.msg);
-                render(); // 刷新分数
+                render();
+                manageTimer();
             }
         };
         ws.onclose = () => setTimeout(connectWebSocket, 3000);
@@ -77,6 +128,7 @@
 
     // 登录界面
     function renderLogin() {
+        stopHighFreqTimer(); // 登录界面不需要高频刷新
         document.getElementById('app').innerHTML = `
             <div class="login-panel" style="max-width:400px; margin:10vh auto;">
                 <h1>安全知识竞赛</h1>
@@ -108,7 +160,7 @@
         }
     }
 
-    // 主持人界面
+    // 主持人界面（省略倒计时显示细节，与之前相同，但会通过 manageTimer 控制刷新）
     function renderHost() {
         const act = gameState.currentActivity;
         const rush = gameState.rush;
@@ -125,21 +177,35 @@
                 </div>
         `;
         if (act === 'rush') {
+            let timerDisplay = '';
+            if (rush.roundState === 'RUSHING') {
+                const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
+                timerDisplay = `<div class="timer">⏰ 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
+            } else if (rush.roundState === 'ANSWERING') {
+                const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
+                timerDisplay = `<div class="timer">⏰ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+            }
             content += `
                 <div class="question-area">
                     <div>当前状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
                     ${rush.currentQuestion ? `<div class="q-text">${rush.currentQuestion.question}</div><div>选项: ${rush.currentQuestion.options.join(' | ')}</div>` : '<div>暂无题目</div>'}
+                    ${timerDisplay}
                     <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button>
                 </div>
             `;
         } else if (act === 'mutual') {
             const currentDraw = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
             const currentAnswer = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
+            let answerTimer = '';
+            if (mutual.roundActive) {
+                const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
+                answerTimer = `<div class="timer">⏰ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+            }
             content += `
                 <div class="question-area">
                     <div>当前抽题队伍: ${currentDraw?.name} (只有该队可点击抽取题目)</div>
                     <div>待回答队伍: ${currentAnswer?.name}</div>
-                    ${mutual.roundActive ? `<div>答题倒计时: ${Math.max(0, Math.ceil((mutual.answerEndTime-Date.now())/1000))}秒</div><div>题目: ${mutual.currentQuestion?.question}</div>` : '<div>未开始一轮问答，请当前抽题队伍点击抽取题目</div>'}
+                    ${mutual.roundActive ? `<div>题目: ${mutual.currentQuestion?.question}</div>${answerTimer}` : '<div>未开始一轮问答，请当前抽题队伍点击抽取题目</div>'}
                     <button class="btn btn-primary" id="drawQuestionBtn" ${mutual.roundActive ? 'disabled' : ''}>抽取题目 (轮到当前抽题队伍时有效)</button>
                 </div>
             `;
@@ -147,7 +213,6 @@
         content += `<div class="team-grid" id="hostTeamScores"></div></div>`;
         document.getElementById('app').innerHTML = content;
 
-        // 队伍分数展示
         const grid = document.getElementById('hostTeamScores');
         if (grid) {
             grid.innerHTML = gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('');
@@ -169,7 +234,6 @@
     // 选手界面
     function renderPlayer() {
         if (!currentPlayer) {
-            // 选手登录表单
             if (!gameState) return;
             const teams = gameState.players;
             document.getElementById('app').innerHTML = `
@@ -210,9 +274,13 @@
                 const isAnswering = (rush.roundState === 'ANSWERING');
                 canBuzz = isRushing && rush.buzzerPlayerId === null;
                 canAnswer = isAnswering && rush.buzzerPlayerId === player.id;
-                if (isRushing) timerHtml = `<div class="timer">抢答倒计时: ${Math.max(0,Math.ceil((rush.rushEndTime-Date.now())/1000))}秒</div>`;
+                if (isRushing) {
+                    const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">🔔 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
+                }
                 if (isAnswering && rush.buzzerPlayerId === player.id) {
-                    timerHtml = `<div class="timer">答题倒计时: ${Math.max(0,Math.ceil((rush.answerEndTime-Date.now())/1000))}秒</div>`;
+                    const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
                 }
                 if (rush.buzzerPlayerId !== null && rush.buzzerPlayerId !== player.id) {
                     const buzzer = gameState.players.find(p=>p.id===rush.buzzerPlayerId);
@@ -228,7 +296,8 @@
                 const opts = mutual.currentQuestion?.options || [];
                 optionsHtml = `<div class="options" id="optionsContainer">${opts.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
                 if (isAnsweringTeam) {
-                    timerHtml = `<div class="timer">答题倒计时: ${Math.max(0,Math.ceil((mutual.answerEndTime-Date.now())/1000))}秒</div>`;
+                    const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">⌛ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
                     canAnswer = true;
                     specialMsg = `<div style="color:#10b981;">🎤 轮到你的队伍回答！点击选项提交答案</div>`;
                 } else {
@@ -239,12 +308,11 @@
                 const nextAnswer = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
                 specialMsg = `<div>当前抽题队伍: ${currentDraw?.name} | 待回答队伍: ${nextAnswer?.name}</div>`;
                 if (mutual.currentDrawTeamId === player.id) {
-                    specialMsg += `<button class="btn btn-primary" id="drawBtn">📖 抽取题目</button>`;
+                    specialMsg += `<button class="btn btn-primary" id="drawBtn" style="margin-top:8px;">📖 抽取题目</button>`;
                 }
             }
         }
 
-        // 分数榜小图标
         const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr)); margin-top:10px;">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}; padding:4px;"><div>${p.emoji}</div><div style="font-size:0.9rem;">${p.score}</div></div>`).join('')}</div>`;
 
         const html = `
@@ -279,7 +347,6 @@
                     opt.onclick = () => {
                         const idx = parseInt(opt.dataset.opt);
                         sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, answerIndex: idx });
-                        // 禁用选项防止重复
                         opts.forEach(o => o.classList.add('disabled'));
                     };
                 });
@@ -296,6 +363,7 @@
 
     // 管理员界面
     function renderAdmin() {
+        stopHighFreqTimer();
         if (!gameState) return;
         const teams = gameState.players;
         const html = `
@@ -328,8 +396,10 @@
         else if (role === 'admin') renderAdmin();
         else renderLogin();
     }
+
     connectWebSocket();
-    // 定时刷新倒计时显示
+    // 初始时没有倒计时，不启动高频计时器；但会在状态变化时通过 manageTimer 启动
+    manageTimer();
 </script>
 </body>
 </html>
