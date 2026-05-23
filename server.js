@@ -109,11 +109,9 @@ function broadcastState() {
         rushRemainingSec,
         mutualRemainingSec,
     };
-    // 清除不可序列化的定时器引用
     stateToSend.rush.rushTimer = null;
     stateToSend.rush.answerTimer = null;
     stateToSend.mutual.answerTimer = null;
-    // 删除绝对时间戳，防止客户端误用
     delete stateToSend.rush.rushEndTime;
     delete stateToSend.rush.answerEndTime;
     delete stateToSend.mutual.answerEndTime;
@@ -166,8 +164,9 @@ function startRushTimeout() {
         if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'RUSHING') {
             gameState.rush.roundState = 'FINISHED';
             gameState.lastAnswerResult = {
-                teamId: null, teamName: '系统',
-                message: '⏰ 抢答时间到，无人抢答',
+                teamId: null,
+                teamName: '系统',
+                message: '⏰ 无人抢答，此题跳过',
                 timestamp: Date.now()
             };
             broadcastState();
@@ -395,7 +394,13 @@ wss.on('connection', (ws) => {
                                 phaseEnded: false, usedQuestionIds: [], answerTimer: null
                             };
                         } else {
-                            gameState.mutual = { currentDrawTeamId: 0, currentAnswerTeamId: 0, currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null, roundActive: false, teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0), phaseEnded: true, usedQuestionIds: [], answerTimer: null };
+                            // 无活跃队伍：允许主持人抽题，但答题时无选手将自动超时
+                            gameState.mutual = {
+                                currentDrawTeamId: 0, currentAnswerTeamId: 1,
+                                currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null,
+                                roundActive: false, teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0),
+                                phaseEnded: false, usedQuestionIds: [], answerTimer: null
+                            };
                         }
                     }
                     gameState.lastBuzzWinner = null;
