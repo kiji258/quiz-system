@@ -92,15 +92,32 @@ function getActiveTeams() {
 }
 
 function broadcastState() {
-    const activeTeams = getActiveTeams().map(t => t.id);
+    const now = Date.now();
+    let rushRemaining = 0, mutualRemaining = 0;
+    if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
+        rushRemaining = Math.max(0, gameState.rush.rushEndTime - now);
+    }
+    if (gameState.mutual.roundActive) {
+        mutualRemaining = Math.max(0, gameState.mutual.answerEndTime - now);
+    }
+
     const stateToSend = {
         ...gameState,
-        activeTeams,
+        activeTeams: getActiveTeams().map(t => t.id),
         teamMembers,
+        rushRemaining,      // 服务器广播时剩余毫秒数
+        mutualRemaining,
+        broadcastTime: now, // 服务器广播时间戳
     };
+    // 清除定时器引用，避免序列化报错
     stateToSend.rush.rushTimer = null;
     stateToSend.rush.answerTimer = null;
     stateToSend.mutual.answerTimer = null;
+    // 删除绝对时间戳，防止客户端误用
+    delete stateToSend.rush.rushEndTime;
+    delete stateToSend.rush.answerEndTime;
+    delete stateToSend.mutual.answerEndTime;
+
     const data = JSON.stringify({ type: 'STATE', state: stateToSend });
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) client.send(data);
