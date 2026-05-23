@@ -22,48 +22,45 @@ const PRESET_TEAMS = [
     { id: 9, name: '观众队', emoji: '👥', color: '#a855f7', score: 0 },
 ];
 
-// 题库（用于抢答和互问互答共用）
-const QUESTIONS = [
+// 独立的题库
+const RUSH_QUESTIONS = [
     { id: 1, type: '选择题', question: '中国的首都是哪个城市？', options: ['上海', '北京', '广州', '深圳'], answer: 1 },
     { id: 2, type: '选择题', question: '地球上最大的海洋是？', options: ['大西洋', '印度洋', '太平洋', '北冰洋'], answer: 2 },
     { id: 3, type: '判断题', question: '光在真空中的速度约为每秒30万公里。', options: ['正确', '错误'], answer: 0 },
-    { id: 4, type: '选择题', question: '以下哪个不是编程语言？', options: ['Python', 'Java', 'Photoshop', 'C++'], answer: 2 },
-    { id: 5, type: '选择题', question: '人体最大的器官是？', options: ['心脏', '肝脏', '皮肤', '大脑'], answer: 2 },
-    { id: 6, type: '判断题', question: '月球自身会发光。', options: ['正确', '错误'], answer: 1 },
-    { id: 7, type: '选择题', question: '"会当凌绝顶，一览众山小"描写的是哪座山？', options: ['黄山', '泰山', '华山', '庐山'], answer: 1 },
-    { id: 8, type: '选择题', question: '水的化学式是？', options: ['CO₂', 'H₂O', 'NaCl', 'O₂'], answer: 1 },
-    { id: 9, type: '判断题', question: '鲸鱼是鱼类。', options: ['正确', '错误'], answer: 1 },
-    { id: 10, type: '选择题', question: '世界杯足球赛每几年举办一次？', options: ['2年', '3年', '4年', '5年'], answer: 2 }
+    // ... 添加更多抢答题目
+];
+
+const MUTUAL_QUESTIONS = [
+    { id: 101, type: '选择题', question: '安全知识：灭火器压力表指针在什么区域表示正常？', options: ['红色', '绿色', '黄色', '蓝色'], answer: 1 },
+    { id: 102, type: '判断题', question: '电器着火时可以直接用水扑灭。', options: ['正确', '错误'], answer: 1 },
+    // ... 添加更多互问互答题目
 ];
 
 // 全局状态
 let gameState = {
     players: PRESET_TEAMS.map(t => ({ ...t })),
     currentActivity: 'rush', // 'rush' 或 'mutual'
-    // 抢答活动状态
     rush: {
-        roundState: 'IDLE', // IDLE, SHOWING, RUSHING, ANSWERING, FINISHED
+        roundState: 'IDLE',
         currentQuestion: null,
-        questionStartTime: 0,
         rushEndTime: 0,
         answerEndTime: 0,
         buzzerPlayerId: null,
         correctAnswer: null,
     },
-    // 互问互答状态
     mutual: {
-        currentDrawTeamId: 0,      // 当前轮到抽题的队伍id
-        currentAnswerTeamId: 1,    // 当前需要回答的队伍id（抽题者的下一个）
+        currentDrawTeamId: 0,
+        currentAnswerTeamId: 1,
         currentQuestion: null,
         answerEndTime: 0,
-        answeringPlayerId: null,    // 正在答题的选手的队伍id（与answerTeamId一致）
-        roundActive: false,         // 是否在一轮问答中（抽题后到答题结束）
+        answeringPlayerId: null,
+        roundActive: false,
+        teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0), // 记录每个队伍答题次数
+        phaseEnded: false,
     },
-    // 通用
     correctPoints: 10,
 };
 
-// 辅助函数：广播状态
 function broadcastState() {
     const data = JSON.stringify({ type: 'STATE', state: gameState });
     wss.clients.forEach(client => {
@@ -80,14 +77,17 @@ function handleRushAnswer(playerId, selectedIndex) {
     const player = gameState.players.find(p => p.id === playerId);
     if (isCorrect) {
         player.score += gameState.correctPoints;
-        broadcastState();
-        // 通知结果
-        return { correct: true, msg: `恭喜 ${player.name} 回答正确！ +${gameState.correctPoints}分` };
-    } else {
-        // 错误不加分不扣分
-        broadcastState();
-        return { correct: false, msg: `再接再厉！ ${player.name} 回答错误。` };
     }
+    rush.roundState = 'FINISHED';
+    broadcastState();
+    // 3秒后重置
+    setTimeout(() => {
+        if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
+            gameState.rush.roundState = 'IDLE';
+            broadcastState();
+        }
+    }, 3000);
+    return { correct: isCorrect, msg: isCorrect ? `✅ 回答正确！ +${gameState.correctPoints}分` : `❌ 回答错误！正确答案是 ${rush.currentQuestion.options[rush.correctAnswer]}` };
 }
 
 // 处理互问互答答题
@@ -101,18 +101,50 @@ function handleMutualAnswer(playerId, selectedIndex) {
     if (isCorrect) {
         player.score += gameState.correctPoints;
     }
+    // 增加该队伍的答题计数
+    mutual.teamAnswerCount[playerId] = (mutual.teamAnswerCount[playerId] || 0) + 1;
     // 结束本轮
     mutual.roundActive = false;
     mutual.currentQuestion = null;
     mutual.answeringPlayerId = null;
-    // 抽题队伍前进到下一个
-    mutual.currentDrawTeamId = (mutual.currentDrawTeamId + 1) % gameState.players.length;
-    mutual.currentAnswerTeamId = (mutual.currentDrawTeamId + 1) % gameState.players.length;
+    // 检查是否所有队伍都完成了2次答题
+    const allDone = mutual.teamAnswerCount.every(count => count >= 2);
+    if (allDone) {
+        mutual.phaseEnded = true;
+        broadcastState();
+        setTimeout(() => {
+            if (gameState.currentActivity === 'mutual') {
+                // 自动重置或提示
+                gameState.mutual.phaseEnded = false;
+                gameState.mutual.teamAnswerCount.fill(0);
+                gameState.currentActivity = 'rush'; // 可选：切回抢答
+                broadcastState();
+            }
+        }, 5000);
+    } else {
+        // 更新下一个抽题和答题队伍：按顺序找下一个未完成2次答题的队伍作为答题方
+        let nextAnswerId = (playerId + 1) % gameState.players.length;
+        while (mutual.teamAnswerCount[nextAnswerId] >= 2 && nextAnswerId !== playerId) {
+            nextAnswerId = (nextAnswerId + 1) % gameState.players.length;
+        }
+        mutual.currentAnswerTeamId = nextAnswerId;
+        mutual.currentDrawTeamId = nextAnswerId; // 下一轮抽题队与答题队一致？按用户需求：“1号队伍抽题，2号队伍回答” → 抽题队与答题队不同。建议抽题队为上一轮的答题队。更简单：抽题队固定为上一轮答题队，答题队为下一顺序未满2次队伍。
+        // 更合理的逻辑：抽题队 = 上一轮答题队，答题队 = 下一个未满2次队伍
+        // 但为了简单，先让抽题队等于当前答题队？不，用户要求“1号抽题2号回答”。我们设定抽题队与答题队不同且轮流。
+        // 这里保持抽题队 = 当前答题队（即刚答完的队伍）的下一个队伍？为了避免复杂，我们重新生成规则：
+        // 重置抽题队为刚答完的队伍，答题队为下一个未满2次队伍。
+        mutual.currentDrawTeamId = playerId;
+        let next = (playerId + 1) % gameState.players.length;
+        while (mutual.teamAnswerCount[next] >= 2 && next !== playerId) {
+            next = (next + 1) % gameState.players.length;
+        }
+        mutual.currentAnswerTeamId = next;
+        broadcastState();
+    }
     broadcastState();
-    return { correct: isCorrect, msg: isCorrect ? `回答正确！ +${gameState.correctPoints}分` : `回答错误！ 正确答案是 ${mutual.currentQuestion.options[mutual.currentQuestion.answer]}` };
+    return { correct: isCorrect, msg: isCorrect ? `✅ 回答正确！ +${gameState.correctPoints}分` : `❌ 回答错误！正确答案是 ${mutual.currentQuestion.options[mutual.currentQuestion.answer]}` };
 }
 
-// WebSocket 连接处理
 wss.on('connection', (ws) => {
     console.log('新客户端连接');
     ws.send(JSON.stringify({ type: 'STATE', state: gameState }));
@@ -121,70 +153,63 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(msg);
             if (data.type === 'HOST_ACTION') {
-                // 主持人操作
                 const { action, payload } = data;
                 if (action === 'selectActivity') {
-                    gameState.currentActivity = payload;
-                    // 重置活动状态
                     if (payload === 'rush') {
-                        gameState.rush = { roundState: 'IDLE', currentQuestion: null, questionStartTime: 0, rushEndTime: 0, answerEndTime: 0, buzzerPlayerId: null, correctAnswer: null };
-                    } else {
-                        gameState.mutual = { currentDrawTeamId: 0, currentAnswerTeamId: 1, currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, roundActive: false };
+                        gameState.currentActivity = 'rush';
+                        gameState.rush = { roundState: 'IDLE', currentQuestion: null, rushEndTime: 0, answerEndTime: 0, buzzerPlayerId: null, correctAnswer: null };
+                    } else if (payload === 'mutual') {
+                        gameState.currentActivity = 'mutual';
+                        gameState.mutual = {
+                            currentDrawTeamId: 0,
+                            currentAnswerTeamId: 1,
+                            currentQuestion: null,
+                            answerEndTime: 0,
+                            answeringPlayerId: null,
+                            roundActive: false,
+                            teamAnswerCount: new Array(gameState.players.length).fill(0),
+                            phaseEnded: false,
+                        };
                     }
                     broadcastState();
                 } else if (action === 'startRush') {
-                    // 开始抢答：随机选一题，40秒抢答倒计时
                     if (gameState.currentActivity !== 'rush') return;
-                    const randomIndex = Math.floor(Math.random() * QUESTIONS.length);
-                    const question = { ...QUESTIONS[randomIndex] };
+                    const randomIndex = Math.floor(Math.random() * RUSH_QUESTIONS.length);
+                    const question = { ...RUSH_QUESTIONS[randomIndex] };
                     gameState.rush.currentQuestion = question;
                     gameState.rush.correctAnswer = question.answer;
                     gameState.rush.roundState = 'RUSHING';
-                    gameState.rush.questionStartTime = Date.now();
-                    gameState.rush.rushEndTime = Date.now() + 40000; // 40秒抢答窗口
+                    gameState.rush.rushEndTime = Date.now() + 40000;
                     gameState.rush.buzzerPlayerId = null;
                     broadcastState();
                 } else if (action === 'drawQuestion') {
-                    // 互问互答：抽题（由当前抽题队伍触发）
                     if (gameState.currentActivity !== 'mutual') return;
                     if (gameState.mutual.roundActive) return;
                     const drawTeamId = payload.drawTeamId;
                     if (drawTeamId !== gameState.mutual.currentDrawTeamId) return;
-                    const randomIndex = Math.floor(Math.random() * QUESTIONS.length);
-                    const question = { ...QUESTIONS[randomIndex] };
+                    const randomIndex = Math.floor(Math.random() * MUTUAL_QUESTIONS.length);
+                    const question = { ...MUTUAL_QUESTIONS[randomIndex] };
                     gameState.mutual.currentQuestion = question;
                     gameState.mutual.roundActive = true;
                     gameState.mutual.answeringPlayerId = gameState.mutual.currentAnswerTeamId;
-                    gameState.mutual.answerEndTime = Date.now() + 80000; // 80秒答题时间
+                    gameState.mutual.answerEndTime = Date.now() + 80000;
                     broadcastState();
                 }
             } else if (data.type === 'PLAYER_RUSH') {
-                // 选手抢答
                 const rush = gameState.rush;
                 if (gameState.currentActivity !== 'rush') return;
                 if (rush.roundState !== 'RUSHING') return;
-                if (rush.buzzerPlayerId !== null) return; // 已经有人抢到
+                if (rush.buzzerPlayerId !== null) return;
                 if (Date.now() > rush.rushEndTime) return;
                 rush.buzzerPlayerId = data.playerId;
                 rush.roundState = 'ANSWERING';
-                rush.answerEndTime = Date.now() + 6000; // 6秒答题
+                rush.answerEndTime = Date.now() + 6000;
                 broadcastState();
             } else if (data.type === 'PLAYER_ANSWER') {
-                // 选手提交答案
                 if (gameState.currentActivity === 'rush') {
                     const result = handleRushAnswer(data.playerId, data.answerIndex);
                     if (result) {
                         ws.send(JSON.stringify({ type: 'ANSWER_RESULT', result }));
-                        // 抢答结束，重置状态
-                        gameState.rush.roundState = 'FINISHED';
-                        broadcastState();
-                        // 3秒后自动回到IDLE
-                        setTimeout(() => {
-                            if (gameState.rush.roundState === 'FINISHED') {
-                                gameState.rush.roundState = 'IDLE';
-                                broadcastState();
-                            }
-                        }, 3000);
                     }
                 } else if (gameState.currentActivity === 'mutual') {
                     const result = handleMutualAnswer(data.playerId, data.answerIndex);
@@ -197,8 +222,6 @@ wss.on('connection', (ws) => {
             console.error('处理消息错误', err);
         }
     });
-
-    ws.on('close', () => console.log('客户端断开'));
 });
 
 const PORT = process.env.PORT || 3000;
