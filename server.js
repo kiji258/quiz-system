@@ -46,9 +46,7 @@ function addHistoryRecord(activityType, teamId, teamName, playerName, question, 
         isCorrect,
         scoreDelta,
     });
-    if (playerName && !teamMembers[teamId].includes(playerName)) {
-        teamMembers[teamId].push(playerName);
-    }
+    if (playerName && !teamMembers[teamId].includes(playerName)) teamMembers[teamId].push(playerName);
     if (answerHistory.length > 500) answerHistory.pop();
 }
 
@@ -317,7 +315,7 @@ function handleMutualAnswer(playerId, playerName, selectedIndex) {
     return { correct: isCorrect, msg: gameState.lastAnswerResult.message };
 }
 
-// ======================== HTTP API ========================
+// HTTP API
 app.get('/api/rush-questions', (req, res) => res.json(RUSH_QUESTIONS));
 app.get('/api/mutual-questions', (req, res) => res.json(MUTUAL_QUESTIONS));
 app.get('/api/history', (req, res) => res.json(answerHistory));
