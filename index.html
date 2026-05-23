@@ -140,59 +140,16 @@
   </div>
 </div>
 
-<script>
-  const hostBtn = document.getElementById('hostBtn');
-  const adminBtn = document.getElementById('adminBtn');
-  const playerBtn = document.getElementById('playerBtn');
-  const btns = [hostBtn, adminBtn, playerBtn];
-
-  btns.forEach(btn => {
-    btn.addEventListener('click', function() {
-      // 全部移除高亮
-      btns.forEach(b => b.classList.remove('btn-highlight'));
-      // 当前按钮高亮
-      this.classList.add('btn-highlight');
-    });
-  });
-</script>
-        let targetRole = null;
-        document.getElementById('hostBtn').onclick = () => { targetRole='host'; document.getElementById('passwordDiv').classList.remove('hidden'); addHighlight(document.getElementById('hostBtn')); };
-        document.getElementById('adminBtn').onclick = () => { targetRole='admin'; document.getElementById('passwordDiv').classList.remove('hidden'); addHighlight(document.getElementById('adminBtn')); };
-        document.getElementById('playerBtn').onclick = () => { addHighlight(document.getElementById('playerBtn')); setTimeout(()=> window.location.href='?role=player',200); };
-        document.getElementById('submitPwd').onclick = () => {
-            if(document.getElementById('password').value==='123') window.location.href=`?role=${targetRole}`;
-            else alert('密码错误');
-        };
-    }
-
-    // ============ 选手登录 ============
-    function renderPlayerLogin() {
-        if(!gameState) return;
-        if(playerLoginRendered) { updateTeamSelectOptions(); return; }
-        document.getElementById('app').innerHTML = `
-            <div class="panel" id="playerLoginPage" style="max-width:400px;margin:10vh auto;">
-                <h2>选手登录</h2>
-                <input id="playerName" placeholder="请输入您的真实姓名">
-                <select id="teamSelect"></select>
-                <button class="btn btn-primary" id="joinBtn" style="width:100%;">进入赛场</button>
-            </div>`;
-        playerLoginRendered = true;
-        updateTeamSelectOptions();
-        document.getElementById('joinBtn').onclick = async () => {
-            const name = document.getElementById('playerName').value.trim();
-            if(!name) return alert('请输入姓名');
-            const teamId = parseInt(document.getElementById('teamSelect').value);
-            await fetch(`/api/team-members/${teamId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerName:name})});
-            currentPlayer = { id: teamId, name: gameState.players.find(p=>p.id===teamId).name, playerName: name };
-            renderFullPage(); startLocalTimers();
-        };
-    }
-    function updateTeamSelectOptions() {
-        const sel = document.getElementById('teamSelect');
-        if(!sel||!gameState) return;
-        sel.innerHTML = gameState.players.map(t => `<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('');
-    }
-
+<div class="panel" id="loginPage" style="max-width:400px;margin:10vh auto;">
+                <h1 style="font-size:2rem;text-align:center;margin-bottom:24px;">安全知识组队竞赛</h1>
+                <button class="btn btn-primary" id="hostBtn" style="width:100%;margin-bottom:12px;">🎤 主持人</button>
+                <button class="btn btn-outline" id="adminBtn" style="width:100%;margin-bottom:12px;">📊 管理员</button>
+                <button class="btn btn-outline" id="playerBtn" style="width:100%;">👥 参赛选手</button>
+                <div id="passwordDiv" class="hidden" style="margin-top:16px;">
+                    <input type="password" id="password" placeholder="请输入密码">
+                    <button class="btn btn-primary" id="submitPwd" style="width:100%;">确认</button>
+                </div>
+            </div>
     // ============ 主持人界面 ============
     function renderHost() {
         const act = gameState.currentActivity;
