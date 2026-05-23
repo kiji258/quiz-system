@@ -251,7 +251,7 @@ function startMutualAnswerTimeout() {
                 }, 4000);
             }
         }
-    }, 80000);
+    }, 40000);
 }
 
 function advanceMutualTurn(answeredTeamId) {
@@ -387,7 +387,7 @@ wss.on('connection', (ws) => {
                     gameState.mutual.roundActive = true;
                     gameState.mutual.answeringPlayerId = gameState.mutual.currentAnswerTeamId;
                     gameState.mutual.answeringPlayerName = null;
-                    gameState.mutual.answerEndTime = Date.now() + 80000;
+                    gameState.mutual.answerEndTime = Date.now() + 40000;
                     gameState.lastAnswerResult = null;
                     startMutualAnswerTimeout();
                     broadcastState();
