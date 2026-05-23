@@ -3,41 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>安全知识竞赛 - 完整版</title>
+    <title>安全知识竞赛 - 倒计时修复版</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
         body { font-family: system-ui, 'Segoe UI', 'PingFang SC', sans-serif; background:#0b0f17; color:#e2e8f0; padding:16px; }
-        .container { max-width:1400px; margin:0 auto; }
-        .hidden { display:none !important; }
         .btn { padding:8px 18px; border-radius:40px; font-weight:bold; border:none; cursor:pointer; transition:0.1s; }
         .btn-primary { background:#f0c040; color:#1e1a0a; }
-        .btn-danger { background:#ef4444; color:white; }
-        .btn-success { background:#10b981; color:white; }
         .btn-outline { background:transparent; border:1px solid #64748b; color:#cbd5e1; }
         .btn:active { transform:scale(0.96); }
-        .login-panel, .admin-panel, .host-panel, .player-panel { background:#111827; border-radius:32px; padding:24px; margin-bottom:20px; }
+        .host-panel, .player-panel, .login-panel, .admin-panel { background:#111827; border-radius:32px; padding:24px; margin-bottom:20px; }
         .team-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:10px; margin-top:16px; }
-        .team-card { background:#1a1f2e; border-radius:20px; padding:8px; text-align:center; border-left:4px solid; transition:0.2s; }
-        .team-card.highlight { transform:scale(1.02); box-shadow:0 0 0 2px #f0c040; background:#2d3a5e; }
+        .team-card { background:#1a1f2e; border-radius:20px; padding:8px; text-align:center; border-left:4px solid; }
         .score-big { font-size:2rem; font-weight:800; }
         .question-area { background:#0f172a; border-radius:28px; padding:20px; margin:16px 0; }
-        .q-text { font-size:2.5rem; font-weight:700; margin:12px 0; word-break:break-word; line-height:1.3; }
+        .q-text { font-size:2.5rem; font-weight:700; margin:12px 0; word-break:break-word; }
         .options { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
-        .option { background:#1e293b; border-radius:60px; padding:14px 20px; font-size:1.3rem; cursor:pointer; transition:0.1s; }
-        .option:active { transform:scale(0.98); background:#334155; }
+        .option { background:#1e293b; border-radius:60px; padding:14px 20px; font-size:1.3rem; cursor:pointer; }
         .option.disabled { opacity:0.5; pointer-events:none; }
         .buzz-btn { background:radial-gradient(circle at 30%20%, #f0c040, #d97706); border:none; border-radius:120px; padding:20px; font-size:2rem; font-weight:900; width:100%; margin:20px 0; cursor:pointer; }
         .buzz-btn.disabled { opacity:0.5; pointer-events:none; }
         .timer { font-size:1.8rem; font-weight:bold; color:#f0c040; text-align:center; margin:10px 0; font-family: monospace; background:#00000066; padding:8px; border-radius:60px; }
-        .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:3px solid #f0c040; padding:12px 28px; border-radius:60px; z-index:2000; animation:fadeOut 3s forwards; font-weight:bold; font-size:1.2rem; box-shadow:0 0 20px rgba(0,0,0,0.5); color:#fde68a; }
-        @keyframes fadeOut { 0%{opacity:1; transform:translateX(-50%) translateY(0);} 80%{opacity:1;} 100%{opacity:0; transform:translateX(-50%) translateY(-20px); visibility:hidden;} }
-        .score-table { width:100%; border-collapse:collapse; }
-        .score-table th, .score-table td { border:1px solid #334155; padding:8px; text-align:center; }
+        .toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1e293b; border:3px solid #f0c040; padding:12px 28px; border-radius:60px; z-index:2000; animation:fadeOut 3s forwards; font-weight:bold; font-size:1.2rem; }
+        @keyframes fadeOut { 0%{opacity:1;} 80%{opacity:1;} 100%{opacity:0; visibility:hidden;} }
         .phase-tip { font-size:1.5rem; font-weight:bold; text-align:center; margin:8px 0; color:#f0c040; }
-        .blink-animation { animation: blink 0.5s ease-in-out 2; }
-        @keyframes blink { 0% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.98); background:#f0c040; color:#1a1a1a; } 100% { opacity:1; transform:scale(1); } }
-        .upload-area { margin:16px 0; padding:12px; border:2px dashed #64748b; border-radius:28px; text-align:center; cursor:pointer; }
-        .upload-area:hover { border-color:#f0c040; background:#1e293b; }
+        .blink { animation: blink 0.5s ease-in-out 2; }
+        @keyframes blink { 0%{opacity:1;} 50%{opacity:0.5; background:#f0c040; color:#1a1a1a;} 100%{opacity:1;} }
     </style>
 </head>
 <body>
@@ -53,31 +43,74 @@
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}`;
 
-    function isCountdownActive() {
-        if (!gameState) return false;
-        const act = gameState.currentActivity;
-        if (act === 'rush') {
-            const rush = gameState.rush;
-            if (rush.roundState === 'RUSHING' && rush.rushEndTime > Date.now()) return true;
-            if (rush.roundState === 'ANSWERING' && rush.answerEndTime > Date.now()) return true;
-        } else if (act === 'mutual') {
-            const mutual = gameState.mutual;
-            if (mutual.roundActive && mutual.answerEndTime > Date.now()) return true;
-        }
-        return false;
+    function showToast(msg) {
+        let t = document.createElement('div');
+        t.className = 'toast';
+        t.innerText = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 3000);
     }
 
-    function manageTimer() {
-        if (isCountdownActive()) {
-            if (!timerInterval) {
-                timerInterval = setInterval(() => {
-                    if ((role === 'player' || role === 'host') && isCountdownActive()) render();
-                    else if (!isCountdownActive() && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                }, 100);
+    function sendMessage(msg) {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    }
+
+    // 统一的倒计时刷新逻辑
+    function updateTimers() {
+        if (!gameState) return;
+        const act = gameState.currentActivity;
+        let needsRender = false;
+        // 抢答活动倒计时
+        if (act === 'rush') {
+            const rush = gameState.rush;
+            if (rush.roundState === 'RUSHING' && rush.rushEndTime) {
+                const remain = (rush.rushEndTime - Date.now()) / 1000;
+                if (remain <= 0) {
+                    // 倒计时结束且未抢答，自动超时
+                    if (rush.roundState === 'RUSHING') {
+                        sendMessage({ type: 'PLAYER_TIMEOUT', reason: 'rush_no_buzz' });
+                    }
+                    needsRender = true;
+                } else {
+                    needsRender = true;
+                }
+            } else if (rush.roundState === 'ANSWERING' && rush.answerEndTime) {
+                const remain = (rush.answerEndTime - Date.now()) / 1000;
+                if (remain <= 0) {
+                    if (rush.roundState === 'ANSWERING') {
+                        sendMessage({ type: 'PLAYER_TIMEOUT', reason: 'answer_timeout' });
+                    }
+                    needsRender = true;
+                } else {
+                    needsRender = true;
+                }
             }
-        } else {
-            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-            if (role === 'player' || role === 'host') render();
+        } else if (act === 'mutual') {
+            const mutual = gameState.mutual;
+            if (mutual.roundActive && mutual.answerEndTime) {
+                const remain = (mutual.answerEndTime - Date.now()) / 1000;
+                if (remain <= 0) {
+                    if (mutual.roundActive) {
+                        sendMessage({ type: 'PLAYER_TIMEOUT', reason: 'mutual_answer_timeout' });
+                    }
+                    needsRender = true;
+                } else {
+                    needsRender = true;
+                }
+            }
+        }
+        if (needsRender) render();
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimers, 100);
+    }
+
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
         }
     }
 
@@ -89,56 +122,18 @@
             if (data.type === 'STATE') {
                 gameState = data.state;
                 render();
-                manageTimer();
+                startTimer();
             } else if (data.type === 'ANSWER_RESULT') {
                 showToast(data.result.msg);
-                render();
-                manageTimer();
-            } else if (data.type === 'TIMEOUT_RESULT') {
-                showToast(data.msg);
                 render();
             }
         };
         ws.onclose = () => setTimeout(connectWebSocket, 3000);
     }
 
-    function sendMessage(msg) {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-    }
-
-    function showToast(msg) {
-        let t = document.createElement('div');
-        t.className = 'toast';
-        t.innerText = msg;
-        document.body.appendChild(t);
-        setTimeout(() => t.remove(), 3000);
-    }
-
-    // 导入题目（抢答题库或互问互答题库）
-    function importQuestions(type) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const data = JSON.parse(ev.target.result);
-                    if (!Array.isArray(data)) throw new Error('数据必须是数组');
-                    sendMessage({ type: 'IMPORT_QUESTIONS', importType: type, questions: data });
-                    showToast(`正在导入 ${type === 'rush' ? '抢答' : '互问互答'} 题库...`);
-                } catch(err) { alert('JSON格式错误：'+err.message); }
-            };
-            reader.readAsText(file);
-        };
-        input.click();
-    }
-
     // 登录界面
     function renderLogin() {
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = null;
+        stopTimer();
         document.getElementById('app').innerHTML = `
             <div class="login-panel" style="max-width:400px; margin:10vh auto;">
                 <h1>安全知识竞赛</h1>
@@ -167,27 +162,13 @@
         }
     }
 
-    // 主持人界面
+    // 主持人界面（精简展示，主要显示倒计时）
     function renderHost() {
         const act = gameState.currentActivity;
         const rush = gameState.rush;
         const mutual = gameState.mutual;
-        let content = `
-            <div class="host-panel">
-                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                    <h2>🎙️ 主持人控制台</h2>
-                    <div><button class="btn btn-outline" id="logoutBtn">退出</button></div>
-                </div>
-                <div style="margin:16px 0; display:flex; gap:10px; flex-wrap:wrap;">
-                    <button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">🏁 抢答活动</button>
-                    <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">🔄 互问互答</button>
-                    <button class="btn btn-outline" id="importRushBtn">📥 导入抢答题库(JSON)</button>
-                    <button class="btn btn-outline" id="importMutualBtn">📥 导入互问互答题库(JSON)</button>
-                </div>
-                <div class="phase-tip">📌 当前阶段：${act==='rush'?'抢答竞赛':'互问互答'}</div>
-        `;
+        let timerDisplay = '';
         if (act === 'rush') {
-            let timerDisplay = '';
             if (rush.roundState === 'RUSHING' && rush.rushEndTime) {
                 const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
                 timerDisplay = `<div class="timer">⏰ 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
@@ -195,82 +176,50 @@
                 const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
                 timerDisplay = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
             }
-            content += `
+        } else if (act === 'mutual' && mutual.roundActive && mutual.answerEndTime) {
+            const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
+            timerDisplay = `<div class="timer">⌛ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+        }
+        const html = `
+            <div class="host-panel">
+                <div style="display:flex; justify-content:space-between;"><h2>🎙️ 主持人</h2><button class="btn btn-outline" id="logoutBtn">退出</button></div>
+                <div style="margin:16px 0;"><button class="btn ${act==='rush'?'btn-primary':'btn-outline'}" id="selectRush">抢答活动</button>
+                <button class="btn ${act==='mutual'?'btn-primary':'btn-outline'}" id="selectMutual">互问互答</button></div>
                 <div class="question-area">
-                    <div>状态: ${rush.roundState==='IDLE'?'空闲':rush.roundState==='RUSHING'?'抢答中':rush.roundState==='ANSWERING'?'答题中':'已结束'}</div>
-                    ${rush.currentQuestion ? `<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>` : '<div>暂无题目</div>'}
+                    ${act === 'rush' ? (rush.currentQuestion ? `<div class="q-text">${rush.currentQuestion.question}</div><div class="options">${rush.currentQuestion.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>` : '<div>暂无题目</div>') : ''}
+                    ${act === 'mutual' && mutual.currentQuestion ? `<div class="q-text">${mutual.currentQuestion.question}</div><div class="options">${mutual.currentQuestion.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>` : ''}
                     ${timerDisplay}
-                    <button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>🎲 开始抢答 (40秒)</button>
+                    ${act === 'rush' ? `<button class="btn btn-primary" id="startRushBtn" ${rush.roundState!=='IDLE'?'disabled':''}>开始抢答 (40秒)</button>` : ''}
+                    ${act === 'mutual' ? `<button class="btn btn-primary" id="drawBtn">📖 抽取题目</button>` : ''}
                 </div>
-            `;
-        } else if (act === 'mutual') {
-            const currentDraw = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
-            const currentAnswer = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
-            let answerTimer = '';
-            if (mutual.roundActive && mutual.answerEndTime) {
-                const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
-                answerTimer = `<div class="timer">⏰ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
-            }
-            content += `
-                <div class="question-area">
-                    <div class="phase-tip" style="font-size:1.2rem;">🎲 抽题队伍：${currentDraw?.name} &nbsp;&nbsp; 🎯 答题队伍：${currentAnswer?.name}</div>
-                    ${mutual.roundActive ? `<div class="q-text">${mutual.currentQuestion?.question}</div><div class="options">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>${answerTimer}` : '<div>未开始一轮问答，请当前抽题队伍点击抽取题目</div>'}
-                    <button class="btn btn-primary" id="drawQuestionBtn" ${mutual.roundActive ? 'disabled' : ''}>📖 抽取题目 (轮到抽题队时有效)</button>
-                </div>
-            `;
-        }
-        content += `<div class="team-grid" id="hostTeamScores"></div></div>`;
-        document.getElementById('app').innerHTML = content;
-
-        const grid = document.getElementById('hostTeamScores');
-        if (grid) grid.innerHTML = gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('');
-
-        // 活动切换确认
-        document.getElementById('selectRush').onclick = () => {
-            if (gameState.currentActivity !== 'rush' && confirm('确认切换到抢答活动吗？当前互问互答进度将重置')) {
-                sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'rush' });
-            }
-        };
-        document.getElementById('selectMutual').onclick = () => {
-            if (gameState.currentActivity !== 'mutual' && confirm('确认切换到互问互答活动吗？当前抢答活动进度将重置')) {
-                sendMessage({ type: 'HOST_ACTION', action: 'selectActivity', payload: 'mutual' });
-            }
-        };
-        document.getElementById('importRushBtn').onclick = () => importQuestions('rush');
-        document.getElementById('importMutualBtn').onclick = () => importQuestions('mutual');
-        if (act === 'rush') {
-            document.getElementById('startRushBtn').onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'startRush' });
-        } else if (act === 'mutual') {
-            const drawBtn = document.getElementById('drawQuestionBtn');
-            drawBtn.onclick = () => {
-                const drawTeamId = gameState.mutual.currentDrawTeamId;
-                drawBtn.classList.add('blink-animation');
-                setTimeout(() => drawBtn.classList.remove('blink-animation'), 600);
-                sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId } });
-            };
-        }
-        document.getElementById('logoutBtn').onclick = () => { window.location.href = '/'; };
+                <div class="team-grid" id="hostScores"></div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = html;
+        document.getElementById('hostScores').innerHTML = gameState.players.map(p => `<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji} ${p.name}</div><div class="score-big">${p.score}</div></div>`).join('');
+        document.getElementById('selectRush').onclick = () => { if(act!=='rush' && confirm('切换活动？')) sendMessage({ type:'HOST_ACTION', action:'selectActivity', payload:'rush' }); };
+        document.getElementById('selectMutual').onclick = () => { if(act!=='mutual' && confirm('切换活动？')) sendMessage({ type:'HOST_ACTION', action:'selectActivity', payload:'mutual' }); };
+        if (act === 'rush') document.getElementById('startRushBtn').onclick = () => sendMessage({ type:'HOST_ACTION', action:'startRush' });
+        if (act === 'mutual') document.getElementById('drawBtn').onclick = () => { sendMessage({ type:'HOST_ACTION', action:'drawQuestion', payload:{ drawTeamId: gameState.mutual.currentDrawTeamId } }); };
+        document.getElementById('logoutBtn').onclick = () => window.location.href='/';
     }
 
-    // 选手界面（仅显示抢答按钮或互问互答控件，省略重复部分，保持与之前版本一致但增加阶段提示）
+    // 选手界面（包含抢答按钮和互问互答抽题/答题）
     function renderPlayer() {
-        // ... 与之前提供的选手界面相同，只需确保 act === 'mutual' 时显示抽题按钮等。
-        // 为了节省篇幅，此处略（但实际代码中应包括完整功能）。用户可使用之前版本中选手界面的正确逻辑。
-        // 由于回答长度限制，下面提供精简但完整的选手界面函数（您可直接替换）。
         if (!currentPlayer) {
             if (!gameState) return;
             const teams = gameState.players;
             document.getElementById('app').innerHTML = `
                 <div class="login-panel" style="max-width:400px; margin:10vh auto;">
                     <h2>选手登录</h2>
-                    <div><label>姓名</label><input id="playerName" placeholder="请输入姓名"></div>
+                    <div><label>姓名</label><input id="playerName"></div>
                     <div><label>队伍</label><select id="teamSelect">${teams.map(t=>`<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('')}</select></div>
-                    <button class="btn btn-primary" id="joinBtn">进入赛场</button>
+                    <button class="btn btn-primary" id="joinBtn">进入</button>
                 </div>
             `;
             document.getElementById('joinBtn').onclick = () => {
                 const name = document.getElementById('playerName').value.trim();
-                if (!name) return alert('请输入姓名');
+                if(!name) return alert('请输入姓名');
                 const teamId = parseInt(document.getElementById('teamSelect').value);
                 currentPlayer = { id: teamId, name };
                 render();
@@ -278,75 +227,87 @@
             return;
         }
         const player = gameState.players.find(p=>p.id===currentPlayer.id);
-        if (!player) return;
+        if(!player) return;
         const act = gameState.currentActivity;
         const rush = gameState.rush;
         const mutual = gameState.mutual;
-        let canBuzz = false, canAnswer = false, showBuzzBtn = (act === 'rush');
-        let questionHtml = '<div>等待主持人开始活动...</div>';
-        let optionsHtml = '', timerHtml = '', specialMsg = '';
-        let phaseTip = act==='rush'?'⚡ 抢答活动 ⚡':'🤝 互问互答 🤝';
+        let canBuzz = false, canAnswer = false, showBuzz = (act === 'rush');
+        let timerHtml = '', questionHtml = '', optionsHtml = '', specialMsg = '';
         if (act === 'rush') {
             if (rush.currentQuestion && rush.roundState !== 'IDLE') {
                 questionHtml = `<div class="q-text">${rush.currentQuestion.question}</div>`;
-                optionsHtml = `<div class="options" id="optionsContainer">${rush.currentQuestion.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
-                canBuzz = (rush.roundState === 'RUSHING' && rush.buzzerPlayerId === null);
-                canAnswer = (rush.roundState === 'ANSWERING' && rush.buzzerPlayerId === player.id);
-                if (rush.roundState === 'RUSHING' && rush.rushEndTime) timerHtml = `<div class="timer">🔔 抢答倒计时: ${Math.max(0,(rush.rushEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
-                if (canAnswer && rush.answerEndTime) timerHtml = `<div class="timer">✏️ 答题倒计时: ${Math.max(0,(rush.answerEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
-                if (rush.buzzerPlayerId && rush.buzzerPlayerId !== player.id) specialMsg = `<div>⚠️ ${gameState.players.find(p=>p.id===rush.buzzerPlayerId)?.name} 已抢答</div>`;
+                optionsHtml = `<div class="options" id="opts">${rush.currentQuestion.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
+                if (rush.roundState === 'RUSHING') {
+                    const remain = Math.max(0, (rush.rushEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">🔔 抢答倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    canBuzz = (rush.buzzerPlayerId === null);
+                } else if (rush.roundState === 'ANSWERING') {
+                    const remain = Math.max(0, (rush.answerEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">✏️ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
+                    canAnswer = (rush.buzzerPlayerId === player.id);
+                }
+                if (rush.buzzerPlayerId && rush.buzzerPlayerId !== player.id) {
+                    const buzzer = gameState.players.find(p=>p.id===rush.buzzerPlayerId);
+                    specialMsg = `<div>⚠️ ${buzzer?.name} 已抢答</div>`;
+                }
+            } else {
+                questionHtml = '<div>等待主持人开始抢答...</div>';
             }
         } else if (act === 'mutual') {
-            if (mutual.phaseEnded) specialMsg = '<div class="phase-tip">🏆 互问互答阶段已结束！</div>';
-            else if (mutual.roundActive) {
+            if (mutual.phaseEnded) {
+                specialMsg = '<div class="phase-tip">🏆 互问互答阶段已结束！</div>';
+            } else if (mutual.roundActive) {
                 const isAnswering = (mutual.answeringPlayerId === player.id);
                 questionHtml = `<div class="q-text">${mutual.currentQuestion?.question}</div>`;
-                optionsHtml = `<div class="options" id="optionsContainer">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
+                optionsHtml = `<div class="options" id="opts">${mutual.currentQuestion?.options.map((opt,i)=>`<div class="option" data-opt="${i}">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}</div>`;
                 if (isAnswering && mutual.answerEndTime) {
-                    timerHtml = `<div class="timer">⌛ 答题倒计时: ${Math.max(0,(mutual.answerEndTime-Date.now())/1000).toFixed(1)}秒</div>`;
+                    const remain = Math.max(0, (mutual.answerEndTime - Date.now()) / 1000);
+                    timerHtml = `<div class="timer">⌛ 答题倒计时: ${remain.toFixed(1)} 秒</div>`;
                     canAnswer = true;
                     specialMsg = '<div style="color:#10b981;">🎤 轮到你的队伍回答！点击选项</div>';
-                } else specialMsg = `<div>⏳ 当前由 ${gameState.players.find(p=>p.id===mutual.answeringPlayerId)?.name} 回答</div>`;
+                } else {
+                    specialMsg = `<div>⏳ 当前由 ${gameState.players.find(p=>p.id===mutual.answeringPlayerId)?.name} 回答</div>`;
+                }
             } else {
                 const curDraw = gameState.players.find(p=>p.id===mutual.currentDrawTeamId);
                 const curAns = gameState.players.find(p=>p.id===mutual.currentAnswerTeamId);
                 specialMsg = `<div>抽题: ${curDraw?.name} | 答题: ${curAns?.name}</div>`;
-                if (mutual.currentDrawTeamId === player.id) specialMsg += `<button class="btn btn-primary" id="drawBtn">📖 抽取题目</button>`;
+                if (mutual.currentDrawTeamId === player.id) specialMsg += `<button class="btn btn-primary" id="drawBtn" style="margin-top:8px;">📖 抽取题目</button>`;
             }
         }
-        const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr));">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}; padding:4px;"><div>${p.emoji}</div><div>${p.score}</div></div>`).join('')}</div>`;
+        const scoreBoard = `<div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(70px,1fr));">${gameState.players.map(p=>`<div class="team-card" style="border-left-color:${p.color}"><div>${p.emoji}</div><div>${p.score}</div></div>`).join('')}</div>`;
         const html = `
             <div class="player-panel">
-                <div><h2>${player.emoji} ${player.name} (${currentPlayer.name})</h2><button class="btn btn-outline" id="logoutBtn">退出</button></div>
-                <div class="phase-tip">${phaseTip}</div>
+                <div style="display:flex; justify-content:space-between;"><h2>${player.emoji} ${player.name} (${currentPlayer.name})</h2><button class="btn btn-outline" id="logoutBtn">退出</button></div>
+                <div class="phase-tip">${act==='rush'?'⚡ 抢答活动 ⚡':'🤝 互问互答 🤝'}</div>
                 <div class="question-area">${questionHtml}${optionsHtml}${timerHtml}${specialMsg}</div>
-                ${showBuzzBtn ? `<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>` : ''}
+                ${showBuzz ? `<button class="buzz-btn ${canBuzz?'':'disabled'}" id="buzzBtn" ${!canBuzz?'disabled':''}>⚡ 抢答</button>` : ''}
                 ${scoreBoard}
             </div>
         `;
         document.getElementById('app').innerHTML = html;
-        if (showBuzzBtn && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({ type: 'PLAYER_RUSH', playerId: player.id });
-        const optsDiv = document.getElementById('optionsContainer');
-        if (optsDiv && canAnswer) document.querySelectorAll('.option').forEach(opt => opt.onclick = () => sendMessage({ type: 'PLAYER_ANSWER', playerId: player.id, answerIndex: parseInt(opt.dataset.opt) }));
+        if (showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({ type:'PLAYER_RUSH', playerId: player.id });
+        const optsDiv = document.getElementById('opts');
+        if (optsDiv && canAnswer) document.querySelectorAll('.option').forEach(opt => opt.onclick = () => sendMessage({ type:'PLAYER_ANSWER', playerId: player.id, answerIndex: parseInt(opt.dataset.opt) }));
         const drawBtn = document.getElementById('drawBtn');
-        if (drawBtn) drawBtn.onclick = () => sendMessage({ type: 'HOST_ACTION', action: 'drawQuestion', payload: { drawTeamId: player.id } });
-        document.getElementById('logoutBtn').onclick = () => { window.location.href = '/'; };
+        if (drawBtn) drawBtn.onclick = () => sendMessage({ type:'HOST_ACTION', action:'drawQuestion', payload:{ drawTeamId: player.id } });
+        document.getElementById('logoutBtn').onclick = () => window.location.href='/';
     }
 
-    // 管理员界面（略，同之前）
     function renderAdmin() {
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = null;
+        stopTimer();
         if (!gameState) return;
-        const teams = gameState.players;
-        const html = `<div class="admin-panel"><h2>📊 管理员 - 分数总览</h2><table class="score-table"><thead><tr><th>队伍</th><th>分数</th></tr></thead><tbody>${teams.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>${p.score}</td></tr>`).join('')}</tbody></table><button class="btn btn-primary" id="exportExcel">📎 导出 Excel</button><button class="btn btn-outline" id="logoutAdmin">退出</button></div>`;
+        const html = `<div class="admin-panel"><h2>📊 管理员 - 分数总览</h2><table border="1" style="width:100%; border-collapse:collapse;"><thead><tr><th>队伍</th><th>分数</th></tr></thead><tbody>${gameState.players.map(p=>`<tr><td>${p.emoji} ${p.name}</td><td>${p.score}</td></tr>`).join('')}</tbody></table><button class="btn btn-primary" id="exportExcel">导出 Excel</button><button class="btn btn-outline" id="logoutAdmin">退出</button></div>`;
         document.getElementById('app').innerHTML = html;
         document.getElementById('exportExcel').onclick = () => {
-            let csv = "队伍,分数\n" + teams.map(p=>`${p.name},${p.score}`).join("\n");
-            const blob = new Blob(["\uFEFF" + csv], {type: 'text/csv;charset=utf-8;'});
-            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = '竞赛分数.csv'; link.click();
+            let csv = "队伍,分数\n" + gameState.players.map(p=>`${p.name},${p.score}`).join("\n");
+            const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '竞赛分数.csv';
+            link.click();
         };
-        document.getElementById('logoutAdmin').onclick = () => { window.location.href = '/'; };
+        document.getElementById('logoutAdmin').onclick = () => window.location.href='/';
     }
 
     function render() {
@@ -358,7 +319,6 @@
     }
 
     connectWebSocket();
-    manageTimer();
 </script>
 </body>
 </html>
