@@ -93,23 +93,23 @@ function getActiveTeams() {
 
 function broadcastState() {
     const now = Date.now();
-    let rushRemaining = 0, mutualRemaining = 0;
+    let rushRemainingSec = 0, mutualRemainingSec = 0;
+
     if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
-        rushRemaining = Math.max(0, gameState.rush.rushEndTime - now);
+        rushRemainingSec = Math.ceil(Math.max(0, gameState.rush.rushEndTime - now) / 1000);
     }
     if (gameState.mutual.roundActive) {
-        mutualRemaining = Math.max(0, gameState.mutual.answerEndTime - now);
+        mutualRemainingSec = Math.ceil(Math.max(0, gameState.mutual.answerEndTime - now) / 1000);
     }
 
     const stateToSend = {
         ...gameState,
         activeTeams: getActiveTeams().map(t => t.id),
         teamMembers,
-        rushRemaining,      // 服务器广播时剩余毫秒数
-        mutualRemaining,
-        broadcastTime: now, // 服务器广播时间戳
+        rushRemainingSec,
+        mutualRemainingSec,
     };
-    // 清除定时器引用，避免序列化报错
+    // 清除不可序列化的定时器引用
     stateToSend.rush.rushTimer = null;
     stateToSend.rush.answerTimer = null;
     stateToSend.mutual.answerTimer = null;
@@ -355,7 +355,23 @@ app.delete('/api/mutual-questions/:id', (req, res) => { MUTUAL_QUESTIONS = MUTUA
 
 wss.on('connection', (ws) => {
     console.log('客户端连接');
-    ws.send(JSON.stringify({ type: 'STATE', state: { ...gameState, activeTeams: getActiveTeams().map(t => t.id), teamMembers } }));
+    const now = Date.now();
+    let initialRushRemainingSec = 0;
+    if (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING') {
+        initialRushRemainingSec = Math.ceil(Math.max(0, gameState.rush.rushEndTime - now) / 1000);
+    }
+    const initialMutualRemainingSec = gameState.mutual.roundActive ? Math.ceil(Math.max(0, gameState.mutual.answerEndTime - now) / 1000) : 0;
+    ws.send(JSON.stringify({
+        type: 'STATE',
+        state: {
+            ...gameState,
+            activeTeams: getActiveTeams().map(t => t.id),
+            teamMembers,
+            rushRemainingSec: initialRushRemainingSec,
+            mutualRemainingSec: initialMutualRemainingSec,
+        }
+    }));
+
     ws.on('message', (msg) => {
         try {
             const data = JSON.parse(msg);
