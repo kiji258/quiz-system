@@ -70,8 +70,6 @@
     let mutualCountdown = 0;
     let countdownInterval = null;
     let answerLocked = false;
-
-    // 用于本地管理结果横幅，不受服务器时间戳影响
     let activeBanner = null; // { message, type, timeoutId }
 
     const wsUrl = `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
@@ -89,11 +87,9 @@
     function sendMessage(msg) { if(ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 
     function setBanner(message, type) {
-        // 清除之前的横幅定时器
         if (activeBanner?.timeoutId) clearTimeout(activeBanner.timeoutId);
         activeBanner = { message, type, timeoutId: setTimeout(() => {
             activeBanner = null;
-            // 重新渲染一次清除横幅（可选，因为直接调用renderFullPage可能触发）
             renderFullPage();
         }, 4000) };
     }
@@ -136,19 +132,11 @@
                     rushCountdown = data.state.rushRemainingSec;
                     mutualCountdown = data.state.mutualRemainingSec || 0;
                 }
-                // 检查是否有新的答题结果
-                if (data.state.lastAnswerResult && data.state.lastAnswerResult.timestamp) {
-                    // 本地设置横幅，独立于服务器时间戳
-                    const msg = data.state.lastAnswerResult.message;
-                    let type = 'info';
-                    if (data.state.lastAnswerResult.isCorrect === true) type = 'correct';
-                    else if (data.state.lastAnswerResult.isCorrect === false) type = 'wrong';
-                    // 对于抢答成功的横幅
-                    if (data.state.lastBuzzWinner && data.state.lastBuzzWinner.timestamp + 4000 > Date.now()) {
-                        setBanner(`🏆 ${data.state.lastBuzzWinner.teamName} 抢答成功`, 'buzz');
-                    } else {
-                        setBanner(msg, type);
-                    }
+                // 检测答题结果或抢答成功，设置横幅
+                if (data.state.lastAnswerResult && data.state.lastAnswerResult.timestamp + 4000 > Date.now()) {
+                    const res = data.state.lastAnswerResult;
+                    const type = res.isCorrect ? 'correct' : 'wrong';
+                    setBanner(res.message, type);
                 } else if (data.state.lastBuzzWinner && data.state.lastBuzzWinner.timestamp + 4000 > Date.now()) {
                     setBanner(`🏆 ${data.state.lastBuzzWinner.teamName} 抢答成功`, 'buzz');
                 }
@@ -156,7 +144,6 @@
                 startCountdownDisplay();
             } else if (data.type === 'ANSWER_RESULT') {
                 showToast(data.result.msg);
-                answerLocked = false;
             }
         };
         ws.onclose = () => setTimeout(connectWebSocket, 3000);
@@ -260,7 +247,6 @@
         if (gameState.activityEnded) {
             bannerHtml = `<div class="result-banner end">🎉 本次活动到此结束，感谢大家参与！</div>`;
         } else if (activeBanner) {
-            // 使用本地管理的横幅
             const cls = activeBanner.type === 'correct' ? 'correct' : (activeBanner.type === 'wrong' ? 'wrong' : 'buzz');
             bannerHtml = `<div class="result-banner ${cls}">${activeBanner.message}</div>`;
         }
@@ -301,9 +287,8 @@
             document.getElementById('selectRush').onclick = () => { if(gameState.currentActivity!=='rush') sendMessage({type:'HOST_ACTION',action:'selectActivity',payload:'rush'}); };
             document.getElementById('selectMutual').onclick = () => { if(gameState.currentActivity!=='mutual') sendMessage({type:'HOST_ACTION',action:'selectActivity',payload:'mutual'}); };
             if (act==='rush') {
-                if (rush.questionsExhausted) {
-                    document.getElementById('endActivityBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'endActivity'});
-                } else {
+                if (rush.questionsExhausted) document.getElementById('endActivityBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'endActivity'});
+                else {
                     document.getElementById('startRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'startRush'});
                     document.getElementById('skipRushBtn').onclick = () => sendMessage({type:'HOST_ACTION',action:'skipRush'});
                 }
@@ -347,7 +332,6 @@
                 if(mutual.currentDrawTeamId===player.id) special += `<button class="btn btn-primary" id="drawBtn">📖 抽题</button>`;
             }
         }
-        // 使用本地横幅显示
         let bannerHtml = '';
         if (activeBanner) {
             const cls = activeBanner.type === 'correct' ? 'correct' : (activeBanner.type === 'wrong' ? 'wrong' : 'buzz');
@@ -362,10 +346,7 @@
             <div class="team-grid">${gameState.players.map(renderTeamCard).join('')}</div></div>`;
         document.getElementById('app').innerHTML = html;
 
-        if(showBuzz && canBuzz) {
-            document.getElementById('buzzBtn').onclick = () => sendMessage({type:'PLAYER_RUSH',playerId:player.id,playerName:currentPlayer.playerName});
-        }
-
+        if(showBuzz && canBuzz) document.getElementById('buzzBtn').onclick = () => sendMessage({type:'PLAYER_RUSH',playerId:player.id,playerName:currentPlayer.playerName});
         const optsDiv = document.getElementById('opts');
         if (optsDiv && canAnswer && !answerLocked) {
             optsDiv.querySelectorAll('.option').forEach(opt => {
@@ -378,13 +359,12 @@
                 };
             });
         }
-
         const drawBtn = document.getElementById('drawBtn');
         if(drawBtn) drawBtn.onclick = () => { drawBtn.classList.add('draw-anim'); sendMessage({type:'HOST_ACTION',action:'drawQuestion',payload:{drawTeamId:player.id}}); setTimeout(()=>drawBtn.classList.remove('draw-anim'),600); };
         document.getElementById('logoutBtn').onclick = () => { currentPlayer=null; playerLoginRendered=false; window.location.href='?role=player'; };
     }
 
-    // ============ 管理员界面 ============
+    // ============ 管理员界面（完整保留） ============
     let adminTab = 'scores';
     async function renderAdmin() {
         document.getElementById('app').innerHTML = `<div class="panel"><h2>📊 管理员后台</h2>
